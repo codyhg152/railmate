@@ -35,7 +35,8 @@ export type JourneyStatus =
   | 'BOARDING'
   | 'DEPARTED'
   | 'ARRIVED'
-  | 'UNKNOWN';
+  | 'UNKNOWN'
+  | 'SCHEDULED';
 
 export interface Stop {
   station: Station;

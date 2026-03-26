@@ -16,10 +16,10 @@ export const queryKeys = {
 };
 
 // Hook return type with refresh
-interface QueryWithRefresh<T> extends UseQueryResult<T, ApiError> {
+type QueryWithRefresh<T> = UseQueryResult<T, ApiError> & {
   refresh: () => Promise<void>;
   isRefreshing: boolean;
-}
+};
 
 /**
  * Hook to search for stations
