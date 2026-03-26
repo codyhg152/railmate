@@ -20,6 +20,7 @@ import { useJourneyStore } from '../stores/journeyStore';
 import { Station, TrainJourney } from '../lib/types';
 import { COLORS } from '../lib/constants';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { StatusBadge } from '../components/StatusBadge';
 import { NoResultsEmptyState, ErrorEmptyState } from '../components/EmptyState';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
@@ -50,23 +51,27 @@ export default function SearchScreen() {
   );
 
   const handleSelectFrom = (station: Station) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFromStation(station);
     setFromQuery(station.name);
     setShowFromResults(false);
   };
 
   const handleSelectTo = (station: Station) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setToStation(station);
     setToQuery(station.name);
     setShowToResults(false);
   };
 
   const handleAddJourney = (journey: TrainJourney) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addJourney(journey);
     router.push(`/journey/${journey.id}`);
   };
 
   const swapStations = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const tempStation = fromStation;
     const tempQuery = fromQuery;
     setFromStation(toStation);

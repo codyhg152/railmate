@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useJourneyStore } from '../../stores/journeyStore';
 import { TrainCard } from '../../components/TrainCard';
 import { TrainCardSkeleton } from '../../components/SkeletonLoader';
@@ -28,10 +29,12 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = React.useState(false);
 
   const handleAddJourney = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push('/search');
   };
 
   const onRefresh = React.useCallback(async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setRefreshing(true);
     // Simulate refresh - in real app, would refresh journey data
     await new Promise(resolve => setTimeout(resolve, 1500));

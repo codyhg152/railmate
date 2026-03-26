@@ -11,6 +11,7 @@ import {
   Animated,
   Pressable,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { TrainJourney } from '../lib/types';
@@ -72,6 +73,7 @@ export function TrainCard({ journey, showProgress = true, index = 0 }: TrainCard
   }, [journey.status]);
 
   const handlePressIn = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.spring(scaleAnim, {
       toValue: 0.98,
       friction: 8,
