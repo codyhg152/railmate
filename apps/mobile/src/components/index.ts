@@ -3,7 +3,7 @@
  */
 export { TrainCard } from './TrainCard';
 export { StationRow } from './StationRow';
-export { StatusBadge } from './StatusBadge';
+export { StatusText } from './StatusText';
 export { ProgressBar } from './ProgressBar';
 export { MapMarker } from './MapMarker';
 export { JourneyTimeline } from './JourneyTimeline';
