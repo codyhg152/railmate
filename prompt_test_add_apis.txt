@@ -1,0 +1,34 @@
+Test all APIs and add Swiss (SBB) and Austrian (ÖBB) API support.
+
+**Test these APIs:**
+1. SNCF (France) - api.sncf.com
+2. National Rail UK - Darwin SOAP
+3. Railtime.io
+
+**Add new APIs:**
+4. Swiss Federal Railways (SBB) - opentransportdata.swiss
+5. Austrian Federal Railways (ÖBB) - v6.oebb.transport.rest
+
+**For each API:**
+1. Test if endpoints work with curl
+2. Check response format
+3. Create adapter file
+4. Add to backend
+
+**Files to create:**
+- server/src/adapters/sbb.ts (Swiss)
+- server/src/adapters/oebb.ts (Austrian)
+
+**Test commands:**
+```bash
+# SNCF
+curl "https://api.sncf.com/v1/coverage/sncf/places?q=Paris"
+
+# ÖBB
+curl "https://v6.oebb.transport.rest/locations?query=Wien"
+
+# SBB (requires key)
+curl "https://api.opentransportdata.swiss/trias2020"
+```
+
+Add both APIs with full implementation like other adapters.

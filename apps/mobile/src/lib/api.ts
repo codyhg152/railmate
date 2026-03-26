@@ -6,7 +6,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { TrainJourney, Station, Departure, SearchResult, Stop, JourneyStatus } from './types';
 
 // Deutsche Bahn API endpoints
-const DB_API_BASE = 'https://v5.db.transport.rest';
+const DB_API_BASE = 'https://v6.db.transport.rest';
 
 // Error types
 export class ApiError extends Error {
@@ -137,7 +137,8 @@ class TrainApi {
           },
         });
 
-        return response.data
+        const departures = response.data.departures || response.data;
+        return departures
           .filter((item: any) => item.tripId && item.stop)
           .map((item: any) => this.mapDeparture(item));
       } catch (error) {
@@ -205,7 +206,8 @@ class TrainApi {
           },
         });
 
-        return this.mapTripToJourney(response.data);
+        // v6 wraps the trip in a { trip: {...} } envelope
+        return this.mapTripToJourney(response.data.trip || response.data);
       } catch (error) {
         console.error('Failed to get journey details:', error);
         return this.getMockJourney(tripId);
@@ -224,7 +226,8 @@ class TrainApi {
           stopovers: true,
         },
       });
-      return response.data;
+      // v6 wraps the trip in a { trip: {...} } envelope
+      return response.data.trip || response.data;
     } catch (error) {
       console.error('Failed to get trip details:', error);
       return null;
@@ -251,8 +254,8 @@ class TrainApi {
       trainNumber: item.line?.name || 'Train',
       trainName: item.line?.productName || item.line?.mode?.toUpperCase(),
       destination: {
-        id: item.direction?.id || 'unknown',
-        name: item.direction?.name || item.direction || 'Unknown',
+        id: typeof item.direction === 'object' ? item.direction?.id || 'unknown' : 'unknown',
+        name: typeof item.direction === 'string' ? item.direction : (item.direction?.name || 'Unknown'),
       },
       scheduledTime: scheduledTime.toISOString(),
       actualTime: actualTime?.toISOString(),
@@ -327,8 +330,8 @@ class TrainApi {
     const origin = stopovers[0];
     const destination = stopovers[stopovers.length - 1];
 
-    const scheduledDeparture = new Date(origin?.plannedDeparture?.date || origin?.departure?.date);
-    const scheduledArrival = new Date(destination?.plannedArrival?.date || destination?.arrival?.date);
+    const scheduledDeparture = new Date(origin?.plannedDeparture || origin?.departure);
+    const scheduledArrival = new Date(destination?.plannedArrival || destination?.arrival);
 
     // Calculate progress
     const now = new Date();
@@ -370,8 +373,8 @@ class TrainApi {
   private mapStops(stopovers: any[]): Stop[] {
     return stopovers.map((stopover, index) => {
       const now = new Date();
-      const arrival = new Date(stopover.arrival?.date || stopover.plannedArrival?.date);
-      const departure = new Date(stopover.departure?.date || stopover.plannedDeparture?.date);
+      const arrival = new Date(stopover.arrival || stopover.plannedArrival);
+      const departure = new Date(stopover.departure || stopover.plannedDeparture);
 
       let status: JourneyStatus = 'UNKNOWN';
       if (now > departure) {
@@ -387,10 +390,10 @@ class TrainApi {
           id: stopover.stop?.id || `stop-${index}`,
           name: stopover.stop?.name || `Stop ${index + 1}`,
         },
-        scheduledArrival: stopover.plannedArrival?.date || stopover.arrival?.date,
-        scheduledDeparture: stopover.plannedDeparture?.date || stopover.departure?.date,
-        actualArrival: stopover.arrival?.date,
-        actualDeparture: stopover.departure?.date,
+        scheduledArrival: stopover.plannedArrival || stopover.arrival,
+        scheduledDeparture: stopover.plannedDeparture || stopover.departure,
+        actualArrival: stopover.arrival,
+        actualDeparture: stopover.departure,
         platform: stopover.arrivalPlatform || stopover.departurePlatform,
         status,
       };

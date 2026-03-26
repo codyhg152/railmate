@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  background: #000000;
+  color: #FFFFFF;
+  width: 390px;
+  height: 844px;
+  overflow: hidden;
+  position: relative;
+}
+.status-bar {
+  height: 47px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 29px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 100;
+  position: relative;
+}
+.map-container {
+  height: 320px;
+  background: linear-gradient(180deg, #0A1628 0%, #1a2a4a 50%, #0d1a2d 100%);
+  position: relative;
+  overflow: hidden;
+}
+.map-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.3;
+}
+.map-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #3a5a8a;
+  border-radius: 50%;
+}
+.route-line {
+  position: absolute;
+  top: 50%;
+  left: 40px;
+  right: 40px;
+  height: 3px;
+  background: linear-gradient(90deg, #007AFF 0%, #5AC8FA 100%);
+  transform: translateY(-50%);
+  border-radius: 2px;
+}
+.route-line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 60%;
+  height: 100%;
+  background: #34C759;
+  border-radius: 2px;
+}
+.station-marker {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.station-marker.start { left: 30px; }
+.station-marker.end { right: 30px; }
+.station-dot {
+  width: 16px;
+  height: 16px;
+  background: #007AFF;
+  border-radius: 50%;
+  border: 3px solid #000000;
+}
+.station-dot.current {
+  background: #34C759;
+  box-shadow: 0 0 0 4px rgba(52,199,89,0.3);
+}
+.station-name {
+  font-size: 11px;
+  color: #8E8E93;
+  margin-top: 8px;
+  font-weight: 500;
+}
+.current-position {
+  position: absolute;
+  top: 50%;
+  left: 55%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  background: #007AFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  border: 3px solid #000000;
+  box-shadow: 0 2px 8px rgba(0,122,255,0.4);
+}
+.cards-container {
+  position: absolute;
+  bottom: 83px;
+  left: 0;
+  right: 0;
+  height: 380px;
+  background: #000000;
+  border-radius: 24px 24px 0 0;
+  padding: 16px 0;
+}
+.bottom-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: #3A3A3C;
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+.card {
+  background: #1C1C1E;
+  border-radius: 16px;
+  margin: 0 16px;
+  padding: 16px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.train-number {
+  font-size: 15px;
+  font-weight: 600;
+  color: #007AFF;
+}
+.status {
+  font-size: 13px;
+  font-weight: 600;
+  color: #34C759;
+}
+.route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.route-city {
+  font-size: 20px;
+  font-weight: 600;
+}
+.route-arrow {
+  color: #8E8E93;
+  font-size: 16px;
+}
+.time-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.time-display {
+  font-size: 48px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+}
+.time-period {
+  font-size: 20px;
+  color: #8E8E93;
+  font-weight: 400;
+}
+.info-row {
+  display: flex;
+  gap: 24px;
+}
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.info-label {
+  font-size: 11px;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.info-value {
+  font-size: 17px;
+  font-weight: 600;
+}
+.info-value.platform {
+  color: #007AFF;
+}
+.swipe-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  background: #3A3A3C;
+  border-radius: 50%;
+}
+.dot.active {
+  background: #007AFF;
+}
+.bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 83px;
+  background: rgba(0,0,0,0.95);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid #1C1C1E;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  padding-top: 8px;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+}
+.nav-item.active .nav-icon {
+  color: #007AFF;
+}
+.nav-item.active .nav-label {
+  color: #007AFF;
+}
+.nav-icon {
+  font-size: 22px;
+  color: #8E8E93;
+}
+.nav-label {
+  font-size: 10px;
+  color: #8E8E93;
+  font-weight: 500;
+}
+</style>
+</head>
+<body>
+<div class="status-bar">
+  <span>9:41</span>
+  <span>●●●●●</span>
+</div>
+<div class="map-container">
+  <div class="map-bg">
+    <div class="map-dot" style="top:20%;left:15%;"></div>
+    <div class="map-dot" style="top:30%;left:25%;"></div>
+    <div class="map-dot" style="top:25%;left:40%;"></div>
+    <div class="map-dot" style="top:35%;left:55%;"></div>
+    <div class="map-dot" style="top:30%;left:70%;"></div>
+    <div class="map-dot" style="top:40%;left:85%;"></div>
+  </div>
+  <div class="route-line"></div>
+  <div class="station-marker start">
+    <div class="station-dot"></div>
+    <div class="station-name">BER</div>
+  </div>
+  <div class="station-marker end">
+    <div class="station-dot"></div>
+    <div class="station-name">MUC</div>
+  </div>
+  <div class="current-position">🚄</div>
+</div>
+<div class="cards-container">
+  <div class="bottom-sheet-handle"></div>
+  <div class="card">
+    <div class="card-header">
+      <span class="train-number">ICE 123</span>
+      <span class="status">On Time</span>
+    </div>
+    <div class="route">
+      <span class="route-city">Berlin</span>
+      <span class="route-arrow">→</span>
+      <span class="route-city">Munich</span>
+    </div>
+    <div class="time-row">
+      <span class="time-display">14:35</span>
+    </div>
+    <div class="info-row">
+      <div class="info-item">
+        <span class="info-label">Platform</span>
+        <span class="info-value platform">5</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Duration</span>
+        <span class="info-value">4h 40m</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Coach</span>
+        <span class="info-value">12</span>
+      </div>
+    </div>
+  </div>
+  <div class="swipe-indicator">
+    <div class="dot active"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+</div>
+<div class="bottom-nav">
+  <div class="nav-item active">
+    <span class="nav-icon">◐</span>
+    <span class="nav-label">Journeys</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">▤</span>
+    <span class="nav-label">Airports</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">✈</span>
+    <span class="nav-label">Profile</span>
+  </div>
+</div>
+</body>
+</html>

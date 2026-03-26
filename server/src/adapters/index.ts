@@ -1,11 +1,13 @@
 /**
  * Railmate API Adapters
- * 
+ *
  * This module provides adapters for various train data APIs:
  * - DeutscheBahnAdapter: German trains (v6.db.transport.rest)
  * - SNCFAdapter: French trains (api.sncf.com)
  * - NationalRailAdapter: UK trains (Darwin SOAP API)
  * - RailtimeAdapter: Multi-source real-time data (railtime.io)
+ * - SBBAdapter: Swiss trains (transport.opendata.ch, no auth required)
+ * - OEBBAdapter: Austrian trains (oebb.macistry.com/api, HAFAS-based)
  */
 
 export { BaseTrainAdapter } from './base';
@@ -13,6 +15,8 @@ export { DeutscheBahnAdapter } from './deutschebahn';
 export { SNCFAdapter } from './sncf';
 export { NationalRailAdapter } from './nationalrail';
 export { RailtimeAdapter, RailtimeSubscriptionRequest, RailtimeChangePayload } from './railtime';
+export { SBBAdapter } from './sbb';
+export { OEBBAdapter } from './oebb';
 
 // Adapter factory for easy instantiation
 import { BaseTrainAdapter } from './base';
@@ -20,6 +24,8 @@ import { DeutscheBahnAdapter } from './deutschebahn';
 import { SNCFAdapter } from './sncf';
 import { NationalRailAdapter } from './nationalrail';
 import { RailtimeAdapter } from './railtime';
+import { SBBAdapter } from './sbb';
+import { OEBBAdapter } from './oebb';
 
 export interface AdapterConfig {
   deutscheBahn?: {
@@ -36,6 +42,12 @@ export interface AdapterConfig {
   railtime?: {
     enabled: boolean;
     apiSecret: string;
+  };
+  sbb?: {
+    enabled: boolean;
+  };
+  oebb?: {
+    enabled: boolean;
   };
 }
 
@@ -59,6 +71,14 @@ export function createAdapters(config: AdapterConfig): BaseTrainAdapter[] {
 
   if (config.railtime?.enabled && config.railtime.apiSecret) {
     adapters.push(new RailtimeAdapter(config.railtime.apiSecret));
+  }
+
+  if (config.sbb?.enabled !== false) {
+    adapters.push(new SBBAdapter());
+  }
+
+  if (config.oebb?.enabled !== false) {
+    adapters.push(new OEBBAdapter());
   }
 
   return adapters;

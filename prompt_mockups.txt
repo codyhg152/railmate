@@ -1,0 +1,22 @@
+Create 4 PNG mockup images showing the current Railmate app UI.
+
+Use Playwright or Puppeteer to generate high-quality screenshots at 390x844 pixels (iPhone 14).
+
+Create HTML files first, then convert to PNG:
+
+1. flights_screen.html → flights_screen.png
+2. airports_screen.html → airports_screen.png  
+3. profile_screen.html → profile_screen.png
+4. live_activity.html → live_activity.png
+
+Design specs:
+- Background: #000000
+- Cards: #1C1C1E
+- Text: #FFFFFF
+- Accent: #007AFF
+- Green: #34C759
+- Orange: #FF9500
+
+Save all to /home/kubbiybot/.openclaw/workspace/railmate/docs/mockups/
+
+After creating PNGs, commit and push to git.
