@@ -1,0 +1,47 @@
+Verify and update ALL API integrations in the Railmate backend.
+
+**Check these API sources:**
+
+1. **Deutsche Bahn (Germany)**
+   - Current: v5.db.transport.rest
+   - Latest: v6.db.transport.rest (v5 is deprecated!)
+   - Check: https://v6.db.transport.rest/
+   - Update all endpoints
+   - Add caching for lower rate limits
+
+2. **SNCF (France)**
+   - Current: api.sncf.com
+   - Check: https://numerique.sncf.com/startup/api/
+   - Verify endpoints still work
+
+3. **National Rail UK**
+   - Current: Darwin SOAP API
+   - Check: https://www.nationalrail.co.uk/developers/
+   - Verify authentication still works
+
+4. **Railtime.io**
+   - Check if still active
+   - Verify webhook functionality
+
+**Files to check and update:**
+- server/src/adapters/deutschebahn.ts
+- server/src/adapters/sncf.ts
+- server/src/adapters/nationalrail.ts
+- server/src/adapters/base.ts
+
+**For each API:**
+1. Check current documentation
+2. Test if endpoints work
+3. Update to latest version
+4. Add proper error handling
+5. Add caching layer
+6. Document rate limits
+
+**Deliverables:**
+- Updated all adapter files
+- Working API integrations
+- Caching implemented
+- Rate limit handling
+- Error handling
+
+Read all adapter files first, then update each one.

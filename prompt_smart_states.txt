@@ -1,0 +1,66 @@
+Implement the 15 Smart States system for the Railmate train tracking app.
+
+**Context:**
+This is a React Native Expo app that tracks trains. We need to implement Flighty-style smart states that show different UI based on the user's context and journey phase.
+
+**The 15 Smart States (from Flighty design):**
+1. farOut (>24h): Show confirmation, terminal info
+2. dayBefore (24h): Show gate, boarding time  
+3. headToStation (~3h): Show 'Leave by' time
+4. atStation: Show current location context
+5. atPlatform: Show boarding countdown
+6. boarding: Show seat info, % boarded
+7. onBoard: Show seated status
+8. taxiing: Show moving to runway
+9. inTransit: Show offline progress visualization
+10. arriving: Show approaching
+11. arrived: Show touched down
+12. atPlatformDest: Show arrived at platform
+13. connection: Show connecting train info
+14. completed: Show trip done
+15. delayed: Any delay state
+
+**Files to modify:**
+1. Create src/utils/smartState.ts - Engine to determine current state
+2. Modify src/components/TrainCard.tsx - Show different content per state
+3. Create src/hooks/useSmartState.ts - Hook to get current state
+4. Modify src/app/(tabs)/flights.tsx - Use smart states
+
+**Example implementation pattern:**
+```typescript
+enum JourneyState {
+  farOut = 'farOut',
+  dayBefore = 'dayBefore', 
+  headToStation = 'headToStation',
+  atStation = 'atStation',
+  atPlatform = 'atPlatform',
+  boarding = 'boarding',
+  departed = 'departed',
+  inTransit = 'inTransit',
+  arriving = 'arriving',
+  arrived = 'arrived',
+  delayed = 'delayed'
+}
+
+interface StateContent {
+  headline: string;
+  primary: string;
+  secondary: string;
+  action?: string;
+}
+```
+
+**Requirements:**
+- Calculate state based on: current time, departure time, user location, train status
+- Return appropriate content for each state
+- Show different UI elements based on state
+- Include haptic feedback for state changes
+- Make it work offline
+
+**Read these files first:**
+- src/lib/types.ts
+- src/lib/constants.ts
+- src/components/TrainCard.tsx
+- src/app/(tabs)/flights.tsx
+
+Implement the complete smart state system with all 15 states adapted for train travel.

@@ -21,11 +21,23 @@ import { COLORS, STATUS_COLORS } from '../../lib/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { format, isToday, isTomorrow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
+import { computeSmartState, JourneyState } from '../../utils/smartState';
+import { useSmartStates } from '../../hooks/useSmartState';
 
 const { width, height } = Dimensions.get('window');
 const MAP_HEIGHT = height * 0.4;
 const CARD_HEIGHT = 120;
 const SNAP_POINTS = [MAP_HEIGHT, height * 0.6, height * 0.15];
+
+const ACCENT_COLOR: Record<string, string> = {
+  danger: COLORS.danger,
+  warning: COLORS.warning,
+  success: COLORS.success,
+  primary: COLORS.primary,
+  info: COLORS.info,
+  text: COLORS.text,
+  textSecondary: COLORS.textSecondary,
+};
 
 // Mock routes
 const ROUTES: Record<string, { coordinates: { latitude: number; longitude: number }[] }> = {
@@ -48,6 +60,9 @@ export default function FlightsScreen() {
   const mapRef = useRef<MapView>(null);
   const scrollX = useRef(new RNAnimated.Value(0)).current;
   const panY = useRef(new RNAnimated.Value(MAP_HEIGHT)).current;
+
+  // Smart states for all journeys (handles haptic on transition)
+  const smartStates = useSmartStates(savedJourneys);
 
   const selectedJourney = savedJourneys[selectedIndex] || null;
 
@@ -102,57 +117,76 @@ export default function FlightsScreen() {
     })
   ).current;
 
-  // Render single flight card (Flighty style - minimal)
+  // Render single flight card (Flighty style - smart state aware)
   const renderFlightCard = (journey: TrainJourney, index: number) => {
     const departureTime = new Date(journey.scheduledDeparture);
     const isActive = index === selectedIndex;
-    
-    // Format time with tabular nums
-    const timeStr = format(departureTime, 'HH:mm');
-    
-    // Smart status text
-    let statusText = 'On Time';
-    let statusColor = COLORS.success;
-    if (journey.status === 'DELAYED' && journey.delayMinutes) {
-      statusText = `+${journey.delayMinutes} min`;
-      statusColor = COLORS.warning;
-    } else if (journey.status === 'CANCELLED') {
-      statusText = 'Cancelled';
-      statusColor = COLORS.danger;
-    }
+    const smartState = smartStates[index];
 
-    // Date label
+    const timeStr = format(departureTime, 'HH:mm');
     let dateLabel = format(departureTime, 'EEE, MMM d');
     if (isToday(departureTime)) dateLabel = 'Today';
     if (isTomorrow(departureTime)) dateLabel = 'Tomorrow';
 
+    const accentColor = smartState?.content.accent
+      ? ACCENT_COLOR[smartState.content.accent] ?? COLORS.text
+      : COLORS.text;
+
+    const isLiveState = smartState && [
+      JourneyState.boarding,
+      JourneyState.atPlatform,
+      JourneyState.taxiing,
+      JourneyState.inTransit,
+      JourneyState.arriving,
+      JourneyState.onBoard,
+    ].includes(smartState.state);
+
     return (
       <TouchableOpacity
         key={journey.id}
-        style={[styles.card, isActive && styles.cardActive]}
+        style={[styles.card, isActive && styles.cardActive, isLiveState && styles.cardLive]}
         onPress={() => router.push(`/journey/${journey.id}`)}
         activeOpacity={0.9}
       >
+        {/* Live state accent bar */}
+        {isLiveState && (
+          <View style={[styles.liveBar, { backgroundColor: accentColor }]} />
+        )}
+
         {/* Time - Most prominent (Flighty style) */}
         <Text style={styles.timeText}>{timeStr}</Text>
-        
-        {/* Route info */}
-        <View style={styles.routeRow}>
-          <Text style={styles.stationText}>{journey.origin.name}</Text>
-          <Ionicons name="arrow-forward" size={14} color={COLORS.textSecondary} style={styles.arrow} />
-          <Text style={styles.stationText}>{journey.destination.name}</Text>
-        </View>
-        
-        {/* Status - Color only, no badge */}
-        <Text style={[styles.statusText, { color: statusColor }]}>
-          {statusText} • {dateLabel}
-        </Text>
-        
-        {/* Gate - Only show if relevant (within 3 hours) */}
-        {isActive && (
-          <Text style={styles.gateText}>
-            Platform {journey.platform}
-          </Text>
+
+        {/* Smart state content */}
+        {smartState ? (
+          <View style={styles.stateContent}>
+            <Text style={[styles.headlineText, { color: accentColor }]} numberOfLines={1}>
+              {smartState.content.headline}
+            </Text>
+            <Text style={styles.primaryText} numberOfLines={1}>
+              {smartState.content.primary}
+            </Text>
+            {smartState.content.secondary && (
+              <Text style={styles.secondaryText} numberOfLines={1}>
+                {smartState.content.secondary}
+              </Text>
+            )}
+          </View>
+        ) : (
+          <View style={styles.stateContent}>
+            <View style={styles.routeRow}>
+              <Text style={styles.stationText}>{journey.origin.name}</Text>
+              <Ionicons name="arrow-forward" size={14} color={COLORS.textSecondary} style={styles.arrow} />
+              <Text style={styles.stationText}>{journey.destination.name}</Text>
+            </View>
+            <Text style={styles.secondaryText}>{dateLabel}</Text>
+          </View>
+        )}
+
+        {/* Action button for boarding states */}
+        {isActive && smartState?.content.action && (
+          <View style={styles.actionBadge}>
+            <Text style={styles.actionText}>{smartState.content.action}</Text>
+          </View>
         )}
       </TouchableOpacity>
     );
@@ -178,7 +212,7 @@ export default function FlightsScreen() {
           <Text style={styles.emptyTitle}>No Upcoming Journeys</Text>
           <Text style={styles.emptySubtitle}>Tap + to add your first train</Text>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -229,7 +263,7 @@ export default function FlightsScreen() {
         <Text style={styles.headerTitle}>
           {savedJourneys.length === 1 ? '1 Journey' : `${savedJourneys.length} Journeys`}
         </Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.headerButton}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -361,10 +395,23 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
+    overflow: 'hidden',
   },
   cardActive: {
     borderColor: COLORS.primary,
     borderWidth: 2,
+  },
+  cardLive: {
+    backgroundColor: '#1C1C2E',
+  },
+  liveBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
   },
   timeText: {
     fontSize: 34,
@@ -373,28 +420,50 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.5,
   },
+  stateContent: {
+    marginTop: 8,
+  },
+  headlineText: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  primaryText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: COLORS.text,
+    marginTop: 2,
+  },
+  secondaryText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
   routeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
   },
   stationText: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '500',
     color: COLORS.text,
   },
   arrow: {
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
-  statusText: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginTop: 8,
+  actionBadge: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
-  gateText: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    marginTop: 4,
+  actionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text,
   },
   pageIndicator: {
     flexDirection: 'row',

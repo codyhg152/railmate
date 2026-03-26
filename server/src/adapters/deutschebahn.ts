@@ -1,6 +1,26 @@
 import { BaseTrainAdapter } from './base';
 import { Station, Departure, Journey, TrainJourney, JourneyStatus, Stopover } from '../types';
 
+/**
+ * Deutsche Bahn Adapter
+ * Uses v6.db.transport.rest API (v5 is deprecated)
+ * 
+ * API Documentation: https://v6.db.transport.rest/
+ * Rate Limit: 100 requests/minute (strict - lower than v5)
+ * 
+ * Changes from v5 to v6:
+ * - Uses db-vendo-client backend instead of HAFAS
+ * - Lower rate limits (be careful with automated requests)
+ * - Some endpoints removed: /stops/reachable-from, /radar
+ * - Profile parameter available: dbnav (default), db, dbweb
+ * 
+ * Caching Strategy:
+ * - Stations: 24 hours
+ * - Departures: 30 seconds
+ * - Journeys: 5 minutes
+ * - Journey Details: 10 seconds
+ */
+
 interface DBLocation {
   id: string;
   name: string;
@@ -10,6 +30,12 @@ interface DBLocation {
     longitude: number;
   };
   products?: Station['products'];
+  weight?: number;
+  ril100Ids?: string[];
+  ifoptId?: string;
+  priceCategory?: number;
+  transitAuthority?: string;
+  stadaId?: string;
 }
 
 interface DBDeparture {
@@ -17,6 +43,19 @@ interface DBDeparture {
   stop: {
     id: string;
     name: string;
+    type?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+    products?: Station['products'];
+    weight?: number;
+    ril100Ids?: string[];
+    ifoptId?: string;
+    priceCategory?: number;
+    transitAuthority?: string;
+    station?: DBLocation;
+    stadaId?: string;
   };
   when: string;
   plannedWhen: string;
@@ -24,16 +63,21 @@ interface DBDeparture {
   platform: string | null;
   plannedPlatform: string | null;
   direction: string;
+  provenance?: string | null;
   line: {
-    id: string;
+    id?: string;
     name: string;
     product: string;
-    productName: string;
-    mode: string;
-    public: boolean;
+    productName?: string;
+    mode?: string;
+    public?: boolean;
+    fahrtNr?: string;
+    operator?: any;
   };
   remarks: Array<{ type: string; code: string; text: string }>;
   cancelled?: boolean;
+  origin?: any;
+  destination?: any;
 }
 
 interface DBJourneyLeg {
@@ -81,21 +125,45 @@ interface DBTripsResponse {
 
 export class DeutscheBahnAdapter extends BaseTrainAdapter {
   constructor() {
-    super('DeutscheBahn', 'https://v5.db.transport.rest', 100);
+    // v6 endpoint - v5 is deprecated
+    super('DeutscheBahn', 'https://v6.db.transport.rest', 100);
+    this.apiVersion = '6.0';
+  }
+
+  /**
+   * Check API health
+   */
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await this.client.get('/locations', {
+        params: { query: 'Berlin', results: 1 },
+        timeout: 5000,
+      });
+      return response.status === 200;
+    } catch (error) {
+      console.error('[DeutscheBahn] Health check failed:', error);
+      return false;
+    }
   }
 
   async searchStations(query: string, limit: number = 10): Promise<Station[]> {
-    const cacheKey = `db:stations:${query}:${limit}`;
+    const cacheKey = `db:v6:stations:${query}:${limit}`;
     const cached = await this.getCached<Station[]>(cacheKey);
     if (cached) return cached;
 
     try {
       const response = await this.client.get<DBLocation[]>('/locations', {
-        params: { query, results: limit, fuzzy: true },
+        params: { 
+          query, 
+          results: limit, 
+          fuzzy: true,
+          // Optional: use different profile for different data sources
+          // profile: 'dbnav' // default, or 'db', 'dbweb'
+        },
       });
 
       const stations = response.data
-        .filter(loc => loc.type === 'station')
+        .filter(loc => loc.type === 'station' || loc.type === 'stop')
         .map(loc => ({
           id: loc.id,
           name: loc.name,
@@ -111,13 +179,13 @@ export class DeutscheBahnAdapter extends BaseTrainAdapter {
       await this.setCached(cacheKey, stations, 86400); // 24 hours
       return stations;
     } catch (error) {
-      console.error('Error searching stations:', error);
+      console.error('[DeutscheBahn] Error searching stations:', error);
       return [];
     }
   }
 
   async getDepartures(stationId: string, duration: number = 60): Promise<Departure[]> {
-    const cacheKey = `db:departures:${stationId}:${duration}`;
+    const cacheKey = `db:v6:departures:${stationId}:${duration}`;
     const cached = await this.getCached<Departure[]>(cacheKey);
     if (cached) return cached;
 
@@ -125,41 +193,61 @@ export class DeutscheBahnAdapter extends BaseTrainAdapter {
       const response = await this.client.get<{ departures: DBDeparture[] }>(
         `/stops/${stationId}/departures`,
         {
-          params: { duration, results: 20 },
+          params: { 
+            duration, 
+            results: 20,
+            // Include additional fields if needed
+            // remarks: true,
+          },
         }
       );
 
-      const departures = response.data.departures.map(dep => ({
-        tripId: dep.tripId,
-        stop: {
-          id: dep.stop.id,
-          name: dep.stop.name,
-          country: 'DE',
-          coordinates: { latitude: 0, longitude: 0 },
-          timezone: 'Europe/Berlin',
-        },
-        when: dep.when,
-        plannedWhen: dep.plannedWhen,
-        delay: dep.delay || 0,
-        platform: dep.platform || dep.plannedPlatform || '',
-        plannedPlatform: dep.plannedPlatform || '',
-        direction: dep.direction,
-        line: dep.line,
-        remarks: dep.remarks || [],
-        cancelled: dep.cancelled || false,
-      }));
+      const departures = response.data.departures.map(dep => {
+        // Handle both station and stop types
+        const stopData = dep.stop.station || dep.stop;
+        
+        return {
+          tripId: dep.tripId,
+          stop: {
+            id: dep.stop.id,
+            name: dep.stop.name,
+            country: 'DE',
+            coordinates: { 
+              latitude: dep.stop.location?.latitude || 0, 
+              longitude: dep.stop.location?.longitude || 0 
+            },
+            timezone: 'Europe/Berlin',
+          },
+          when: dep.when,
+          plannedWhen: dep.plannedWhen,
+          delay: dep.delay || 0,
+          platform: dep.platform || dep.plannedPlatform || '',
+          plannedPlatform: dep.plannedPlatform || '',
+          direction: dep.direction,
+          line: {
+            id: dep.line.id || dep.line.name,
+            name: dep.line.name,
+            product: dep.line.product,
+            productName: dep.line.productName || dep.line.name,
+            mode: dep.line.mode || 'train',
+            public: dep.line.public ?? true,
+          },
+          remarks: dep.remarks || [],
+          cancelled: dep.cancelled || false,
+        };
+      });
 
       await this.setCached(cacheKey, departures, 30); // 30 seconds
       return departures;
     } catch (error) {
-      console.error('Error getting departures:', error);
+      console.error('[DeutscheBahn] Error getting departures:', error);
       return [];
     }
   }
 
   async searchJourneys(from: string, to: string, date?: string): Promise<Journey[]> {
     const departureTime = date || new Date().toISOString();
-    const cacheKey = `db:journeys:${from}:${to}:${departureTime}`;
+    const cacheKey = `db:v6:journeys:${from}:${to}:${departureTime}`;
     const cached = await this.getCached<Journey[]>(cacheKey);
     if (cached) return cached;
 
@@ -170,11 +258,14 @@ export class DeutscheBahnAdapter extends BaseTrainAdapter {
           to,
           departure: departureTime,
           results: 5,
+          // Optional parameters:
+          // transfers: 2, // max transfers
+          // transferTime: 10, // minimum transfer time in minutes
         },
       });
 
       const journeys = response.data.journeys.map((journey, index) => ({
-        id: `db-${from}-${to}-${departureTime}-${index}`,
+        id: `db-v6-${from}-${to}-${departureTime}-${index}`,
         type: journey.type,
         legs: journey.legs,
         price: journey.price,
@@ -183,13 +274,13 @@ export class DeutscheBahnAdapter extends BaseTrainAdapter {
       await this.setCached(cacheKey, journeys, 300); // 5 minutes
       return journeys;
     } catch (error) {
-      console.error('Error searching journeys:', error);
+      console.error('[DeutscheBahn] Error searching journeys:', error);
       return [];
     }
   }
 
   async getJourneyDetails(journeyId: string): Promise<TrainJourney | null> {
-    const cacheKey = `db:journey:${journeyId}`;
+    const cacheKey = `db:v6:journey:${journeyId}`;
     const cached = await this.getCached<TrainJourney>(cacheKey);
     if (cached) return cached;
 
@@ -219,15 +310,15 @@ export class DeutscheBahnAdapter extends BaseTrainAdapter {
         trainNumber: trip.line.name,
         trainType: trip.line.product,
         origin: {
-          id: firstStop.stop.id,
-          name: firstStop.stop.name,
+          id: firstStop.stop?.id || '',
+          name: firstStop.stop?.name || '',
           country: 'DE',
           coordinates: { latitude: 0, longitude: 0 },
           timezone: 'Europe/Berlin',
         },
         destination: {
-          id: lastStop.stop.id,
-          name: lastStop.stop.name,
+          id: lastStop.stop?.id || '',
+          name: lastStop.stop?.name || '',
           country: 'DE',
           coordinates: { latitude: 0, longitude: 0 },
           timezone: 'Europe/Berlin',
@@ -249,7 +340,7 @@ export class DeutscheBahnAdapter extends BaseTrainAdapter {
       await this.setCached(cacheKey, trainJourney, 10); // 10 seconds
       return trainJourney;
     } catch (error) {
-      console.error('Error getting journey details:', error);
+      console.error('[DeutscheBahn] Error getting journey details:', error);
       return null;
     }
   }
