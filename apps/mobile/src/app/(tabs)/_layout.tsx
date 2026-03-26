@@ -36,22 +36,22 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="map"
         options={{
-          title: 'My Trains',
-          headerTitle: 'Railmate',
+          title: 'Map',
+          headerTitle: 'Live Map',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="train-outline" size={size} color={color} />
+            <Ionicons name="map-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="map"
+        name="index"
         options={{
-          title: 'Map',
-          headerTitle: 'Route Map',
+          title: 'My Trains',
+          headerTitle: 'My Journeys',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map-outline" size={size} color={color} />
+            <Ionicons name="train-outline" size={size} color={color} />
           ),
         }}
       />

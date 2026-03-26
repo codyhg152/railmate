@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Railmate - Map Screen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+            background: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .iphone {
+            width: 390px;
+            height: 844px;
+            background: #000000;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 47px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 27px;
+            z-index: 100;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+
+        .time {
+            color: #fff;
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .status-icons {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .signal, .wifi, .battery {
+            width: 18px;
+            height: 12px;
+            background: #fff;
+            border-radius: 2px;
+        }
+
+        /* Header */
+        .header {
+            position: absolute;
+            top: 47px;
+            left: 0;
+            right: 0;
+            height: 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 16px;
+            z-index: 100;
+        }
+
+        .header-title {
+            color: #fff;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .locate-btn {
+            width: 36px;
+            height: 36px;
+            background: rgba(28, 28, 30, 0.9);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .locate-icon {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .locate-icon::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 6px;
+            height: 6px;
+            background: #007AFF;
+            border-radius: 50%;
+        }
+
+        /* Map Container */
+        .map-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #1a1a1a;
+        }
+
+        /* Dark Map Background */
+        .map-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at 20% 30%, rgba(40,40,40,0.8) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 60%, rgba(35,35,35,0.6) 0%, transparent 40%),
+                radial-gradient(ellipse at 40% 80%, rgba(45,45,45,0.5) 0%, transparent 45%),
+                radial-gradient(ellipse at 80% 20%, rgba(30,30,30,0.7) 0%, transparent 35%),
+                #0d0d0d;
+        }
+
+        /* Water areas */
+        .water {
+            position: absolute;
+            background: #000000;
+            border-radius: 50%;
+        }
+
+        .water-1 {
+            width: 200px;
+            height: 150px;
+            top: 15%;
+            right: -50px;
+        }
+
+        .water-2 {
+            width: 180px;
+            height: 120px;
+            bottom: 25%;
+            left: -40px;
+        }
+
+        /* SVG Route Line */
+        .route-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .route-line {
+            fill: none;
+            stroke: #007AFF;
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .route-line-bg {
+            fill: none;
+            stroke: rgba(0, 122, 255, 0.2);
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Station Markers */
+        .station {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .station-marker {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+
+        .station-marker.origin {
+            background: #34C759;
+            width: 18px;
+            height: 18px;
+        }
+
+        .station-marker.stop {
+            background: #8E8E93;
+            width: 12px;
+            height: 12px;
+        }
+
+        .station-marker.destination {
+            background: #007AFF;
+            width: 18px;
+            height: 18px;
+        }
+
+        .station-label {
+            color: #fff;
+            font-size: 11px;
+            font-weight: 500;
+            margin-top: 6px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            white-space: nowrap;
+        }
+
+        /* Train Position */
+        .train-marker {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+        }
+
+        .train-pulse {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 122, 255, 0.3);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+        }
+
+        .train-dot {
+            position: relative;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border: 3px solid #007AFF;
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Bottom Card */
+        .bottom-card {
+            position: absolute;
+            bottom: 90px;
+            left: 16px;
+            right: 16px;
+            background: #1C1C1E;
+            border-radius: 16px;
+            padding: 16px;
+            z-index: 100;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .train-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            background: #007AFF;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .status {
+            color: #34C759;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .route-info {
+            margin-bottom: 12px;
+        }
+
+        .route-text {
+            color: #fff;
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .route-arrow {
+            color: #8E8E93;
+            margin: 0 4px;
+        }
+
+        /* Progress Bar */
+        .progress-section {
+            margin-bottom: 12px;
+        }
+
+        .progress-bar-bg {
+            height: 6px;
+            background: #2C2C2E;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 45%;
+            background: linear-gradient(90deg, #007AFF, #5AC8FA);
+            border-radius: 3px;
+        }
+
+        .progress-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+        }
+
+        .progress-label {
+            color: #8E8E93;
+            font-size: 12px;
+        }
+
+        /* Trip Details */
+        .trip-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid #2C2C2E;
+        }
+
+        .time-range {
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .platform {
+            color: #8E8E93;
+            font-size: 13px;
+        }
+
+        .platform span {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .next-stop {
+            text-align: right;
+        }
+
+        .next-stop-label {
+            color: #8E8E93;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .next-stop-name {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Tab Bar */
+        .tab-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 83px;
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 100;
+        }
+
+        .tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 20px;
+        }
+
+        .tab-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tab-icon.map svg {
+            width: 22px;
+            height: 22px;
+            fill: #007AFF;
+        }
+
+        .tab-icon.trips svg {
+            width: 20px;
+            height: 20px;
+            stroke: #8E8E93;
+            stroke-width: 1.8;
+            fill: none;
+        }
+
+        .tab-icon.profile svg {
+            width: 20px;
+            height: 20px;
+            stroke: #8E8E93;
+            stroke-width: 1.8;
+            fill: none;
+        }
+
+        .tab-label {
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .tab.active .tab-label {
+            color: #007AFF;
+        }
+
+        .tab:not(.active) .tab-label {
+            color: #8E8E93;
+        }
+
+        /* Home Indicator */
+        .home-indicator {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 134px;
+            height: 5px;
+            background: #fff;
+            border-radius: 3px;
+            z-index: 101;
+        }
+    </style>
+</head>
+<body>
+    <div class="iphone">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <span class="time">9:41</span>
+            <div class="status-icons">
+                <div class="signal"></div>
+                <div class="wifi"></div>
+                <div class="battery"></div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <h1 class="header-title">Live Map</h1>
+            <div class="locate-btn">
+                <div class="locate-icon"></div>
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div class="map-container">
+            <div class="map-bg"></div>
+            
+            <!-- Water areas -->
+            <div class="water water-1"></div>
+            <div class="water water-2"></div>
+
+            <!-- SVG Route -->
+            <svg class="route-svg" viewBox="0 0 390 844" preserveAspectRatio="none">
+                <!-- Background glow -->
+                <path class="route-line-bg" d="M 80 180 Q 130 220 160 280 T 200 400 T 240 520 T 280 620 Q 300 660 320 700" />
+                <!-- Main route line -->
+                <path class="route-line" d="M 80 180 Q 130 220 160 280 T 200 400 T 240 520 T 280 620 Q 300 660 320 700" />
+            </svg>
+
+            <!-- Stations -->
+            <div class="station" style="left: 80px; top: 180px;">
+                <div class="station-marker origin"></div>
+                <span class="station-label">Berlin Hbf</span>
+            </div>
+
+            <div class="station" style="left: 160px; top: 280px;">
+                <div class="station-marker stop"></div>
+                <span class="station-label">Leipzig</span>
+            </div>
+
+            <div class="station" style="left: 200px; top: 400px;">
+                <div class="station-marker stop"></div>
+                <span class="station-label">Erfurt</span>
+            </div>
+
+            <div class="station" style="left: 240px; top: 520px;">
+                <div class="station-marker stop"></div>
+                <span class="station-label">Mannheim</span>
+            </div>
+
+            <div class="station" style="left: 280px; top: 620px;">
+                <div class="station-marker stop"></div>
+                <span class="station-label">Stuttgart</span>
+            </div>
+
+            <div class="station" style="left: 320px; top: 700px;">
+                <div class="station-marker destination"></div>
+                <span class="station-label">München Hbf</span>
+            </div>
+
+            <!-- Train Position (~45% along the route) -->
+            <div class="train-marker" style="left: 205px; top: 410px;">
+                <div class="train-pulse"></div>
+                <div class="train-dot"></div>
+            </div>
+        </div>
+
+        <!-- Bottom Card -->
+        <div class="bottom-card">
+            <div class="card-header">
+                <div class="train-badge">
+                    <span class="badge">ICE 123</span>
+                    <span class="status">On Time</span>
+                </div>
+            </div>
+
+            <div class="route-info">
+                <span class="route-text">Berlin Hbf</span>
+                <span class="route-arrow">→</span>
+                <span class="route-text">München Hbf</span>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill"></div>
+                </div>
+                <div class="progress-labels">
+                    <span class="progress-label">45% complete</span>
+                    <span class="progress-label">~3h 20m remaining</span>
+                </div>
+            </div>
+
+            <div class="trip-details">
+                <div>
+                    <div class="time-range">14:35 – 19:15</div>
+                    <div class="platform">Platform <span>5</span></div>
+                </div>
+                <div class="next-stop">
+                    <div class="next-stop-label">Next Stop</div>
+                    <div class="next-stop-name">Mannheim Hbf</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <div class="tab active">
+                <div class="tab-icon map">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                </div>
+                <span class="tab-label">Map</span>
+            </div>
+            <div class="tab">
+                <div class="tab-icon trips">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="4" width="18" height="16" rx="2"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                    </svg>
+                </div>
+                <span class="tab-label">Trips</span>
+            </div>
+            <div class="tab">
+                <div class="tab-icon profile">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+                    </svg>
+                </div>
+                <span class="tab-label">Profile</span>
+            </div>
+        </div>
+
+        <!-- Home Indicator -->
+        <div class="home-indicator"></div>
+    </div>
+</body>
+</html>
