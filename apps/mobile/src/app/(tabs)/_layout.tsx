@@ -1,5 +1,6 @@
 /**
- * Tab navigation layout
+ * Tab navigation layout - Flighty-style
+ * Main tabs: Flights, Airports, Profile
  */
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,55 +24,38 @@ export default function TabLayout() {
           fontSize: 10,
           fontWeight: '500',
         },
-        headerStyle: {
-          backgroundColor: COLORS.background,
-        },
-        headerTintColor: COLORS.text,
-        headerTitleStyle: {
-          fontWeight: '700',
-          fontSize: 34,
-          letterSpacing: -0.5,
-        },
-
+        headerShown: false, // Hide header - we'll do custom in each screen
       }}
     >
+      {/* Main screen - Combined map + list like Flighty */}
       <Tabs.Screen
-        name="map"
+        name="flights"
         options={{
-          title: 'Map',
-          headerTitle: 'Live Map',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'My Trains',
-          headerTitle: 'My Journeys',
+          title: 'Journeys',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="train-outline" size={size} color={color} />
           ),
         }}
       />
+      
+      {/* Airports/Stations - Airport info like Flighty */}
       <Tabs.Screen
-        name="stations"
+        name="airports"
         options={{
-          title: 'Stations',
-          headerTitle: 'Stations',
+          title: 'Airports',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="business-outline" size={size} color={color} />
           ),
         }}
       />
+      
+      {/* Profile/Stats - Travel stats like Flighty Passport */}
       <Tabs.Screen
-        name="passport"
+        name="profile"
         options={{
-          title: 'Passport',
-          headerTitle: 'Passport',
+          title: 'Profile',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="card-outline" size={size} color={color} />
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />
