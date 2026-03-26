@@ -19,7 +19,11 @@
       "infoPlist": {
         "NSSupportsLiveActivities": true,
         "NSSupportsLiveActivitiesFrequentUpdates": true,
-        "NSLocationWhenInUseUsageDescription": "Railmate uses your location to show nearby stations and track your journey progress."
+        "NSLocationWhenInUseUsageDescription": "Railmate uses your location to show nearby stations and track your journey progress.",
+        "UIBackgroundModes": ["fetch", "remote-notification"]
+      },
+      "entitlements": {
+        "com.apple.developer.live-activities": true
       }
     },
     "android": {

@@ -1,0 +1,73 @@
+Add iOS Live Activities support to the Railmate React Native app using Swift modules.
+
+**Context:**
+- React Native Expo app (already set up)
+- Need to add native Swift module for Live Activities
+- Flighty uses Live Activities extensively - we need to match this
+
+**What to implement:**
+
+1. **Create Swift Live Activity Module**
+   - File: `ios/LiveActivity/LiveActivityModule.swift`
+   - Bridge to React Native using RCTBridgeModule
+   - Methods: startActivity, updateActivity, endActivity
+
+2. **Create Widget Extension**
+   - File: `ios/TrainWidget/TrainWidgetLiveActivity.swift`
+   - Define ActivityAttributes for train journeys
+   - Create compact and expanded views
+   - Support Dynamic Island
+
+3. **Update App Configuration**
+   - Enable Live Activities in app.json
+   - Add NSSupportsLiveActivities to Info.plist
+   - Configure provisioning for widgets
+
+4. **Create React Native Bridge**
+   - File: `src/modules/LiveActivity.ts`
+   - TypeScript interface for Swift module
+   - Hook: `useLiveActivity.ts`
+
+5. **Integration with App**
+   - Update TrainCard to start Live Activity on press
+   - Update journey detail to show Live Activity status
+   - Handle activity updates when journey status changes
+
+**Live Activity Views to create:**
+
+**Compact (Dynamic Island minimal):**
+```
+[Train icon] ICE 123    14:35    Plat 5
+```
+
+**Expanded (Dynamic Island long press):**
+```
+ICE 123 to Munich
+Platform 5 • On Time
+[Progress bar]
+```
+
+**Lock Screen:**
+```
+ICE 123 Berlin → Munich
+Platform 5 • 14:35
+[▓▓▓▓▓▓░░░░] 45 min left
+```
+
+**Technical requirements:**
+- Use ActivityKit framework
+- Support iOS 16.1+
+- Handle push-to-start tokens
+- Work offline (no network required for display)
+- Update via push notifications or app
+
+**Files to create/modify:**
+1. ios/LiveActivity/LiveActivityModule.swift
+2. ios/LiveActivity/LiveActivityModule.m (bridge)
+3. ios/TrainWidget/TrainWidgetAttributes.swift
+4. ios/TrainWidget/TrainWidgetLiveActivity.swift
+5. src/modules/LiveActivity.ts
+6. src/hooks/useLiveActivity.ts
+7. app.json (add Live Activities config)
+
+Read the current iOS project structure first, then implement.

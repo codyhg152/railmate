@@ -1,0 +1,115 @@
+Create a complete build setup for Railmate app on both Android and iOS.
+
+**Current Status:**
+- React Native Expo app with Swift modules for Live Activities
+- All APIs updated to v6
+- Smart states implemented
+- Need build configuration
+
+**Create build setup for:**
+
+## 1. Android Build (APK/AAB)
+
+**Using EAS Build (Recommended):**
+```bash
+cd apps/mobile
+# Install EAS CLI
+npm install -g eas-cli
+
+# Login to Expo (required)
+eas login
+
+# Configure build
+eas build:configure
+
+# Build APK for testing
+eas build --platform android --profile preview
+
+# Or build AAB for Play Store
+eas build --platform android --profile production
+```
+
+**Alternative: Local Build**
+- Fix Gradle issues
+- Build with Android Studio
+
+## 2. iOS Build (IPA)
+
+**Prerequisites:**
+- macOS with Xcode
+- Apple Developer Account ($99/year)
+- Provisioning profiles
+
+**Using EAS Build:**
+```bash
+# Build for device
+eas build --platform ios --profile preview
+
+# Or for App Store
+eas build --platform ios --profile production
+```
+
+**Required iOS Setup:**
+1. Create App ID in Apple Developer Portal
+2. Create provisioning profiles
+3. Configure signing in Xcode
+4. Enable Live Activities entitlement
+
+## 3. Create Build Profiles
+
+**Update eas.json with proper profiles:**
+```json
+{
+  "build": {
+    "preview": {
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": false }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  }
+}
+```
+
+## 4. Environment Variables
+
+**Create .env files:**
+- API tokens for SNCF, National Rail
+- Backend URL
+- Other secrets
+
+## 5. Pre-build Checklist
+
+**Verify:**
+- [ ] All API keys configured
+- [ ] App icons generated
+- [ ] Splash screen set
+- [ ] Version numbers updated
+- [ ] Permissions declared
+- [ ] Live Activities entitlement (iOS)
+
+## 6. Testing
+
+**Android:**
+- Install APK on device
+- Test all features
+- Check API connections
+
+**iOS:**
+- Install via TestFlight
+- Test on physical device
+- Verify Live Activities
+
+**Files to create:**
+1. BUILD_GUIDE.md - Complete instructions
+2. .env.example - Environment template
+3. eas.json - Build profiles (update)
+4. app.json - Verify configuration
+
+**Read current files:**
+- app.json
+- eas.json
+- package.json
+
+Create complete build documentation and configuration.

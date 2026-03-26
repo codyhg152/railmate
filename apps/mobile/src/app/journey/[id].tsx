@@ -1,8 +1,9 @@
 /**
  * Journey Detail Screen
  * Shows detailed journey information with live progress and timeline
+ * Enhanced with Live Activity status and controls
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,13 +11,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import { useJourneyDetails, usePullToRefresh } from '../../hooks/useJourneys';
-import { useLiveActivity } from '../../hooks/useLiveActivity';
+import * as Haptics from 'expo-haptics';
+import { useJourneyDetails } from '../../hooks/useJourneys';
+import { useLiveActivity, useLiveActivityUpdater } from '../../hooks/useLiveActivity';
 import { useJourneyStore } from '../../stores/journeyStore';
-import { StatusBadge } from '../../components/StatusBadge';
 import { ProgressBar } from '../../components/ProgressBar';
 import { JourneyTimeline } from '../../components/JourneyTimeline';
 import { JourneyDetailSkeleton } from '../../components/SkeletonLoader';
@@ -36,31 +38,141 @@ export default function JourneyDetailScreen() {
     refresh,
     isRefreshing,
   } = useJourneyDetails(id);
-  const { isSupported, startActivity, updateActivity } = useLiveActivity();
+  const { 
+    isSupported, 
+    startActivity, 
+    updateActivity, 
+    endActivity, 
+    activeActivities,
+    refreshActivities,
+  } = useLiveActivity();
   const addJourney = useJourneyStore((state) => state.addJourney);
-  const [activityId, setActivityId] = React.useState<string | null>(null);
+  const [activityId, setActivityId] = useState<string | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
 
+  // Check if this journey has an active Live Activity
+  useEffect(() => {
+    if (journey && activeActivities.length > 0) {
+      const existingActivity = activeActivities.find(
+        (activity) => 
+          activity.trainNumber === journey.trainNumber &&
+          activity.origin === journey.origin.name
+      );
+      if (existingActivity) {
+        setActivityId(existingActivity.id);
+        setIsTracking(true);
+      }
+    }
+  }, [journey, activeActivities]);
+
+  // Save journey to store
   useEffect(() => {
     if (journey) {
       addJourney(journey);
     }
-  }, [journey]);
+  }, [journey, addJourney]);
 
-  const handleTrackJourney = async () => {
-    if (!journey || !isSupported) return;
+  // Auto-update Live Activity when journey data changes
+  useLiveActivityUpdater(
+    activityId,
+    journey
+      ? {
+          status: journey.status,
+          progress: journey.progress || 0,
+          delayMinutes: journey.delayMinutes,
+          currentStation: journey.stops?.find((s) => s.status === 'DEPARTED')?.station.name,
+        }
+      : { status: 'SCHEDULED', progress: 0 }
+  );
+
+  const handleTrackJourney = useCallback(async () => {
+    if (!journey || !isSupported) {
+      Alert.alert(
+        'Live Activities Not Available',
+        'Live Activities require iOS 16.1 or later.'
+      );
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Calculate progress and time remaining
+    const now = new Date();
+    const departure = new Date(journey.scheduledDeparture);
+    const arrival = new Date(journey.scheduledArrival);
+    const totalDuration = arrival.getTime() - departure.getTime();
+    const remaining = arrival.getTime() - now.getTime();
+    const progress = Math.max(0, Math.min(100, ((totalDuration - remaining) / totalDuration) * 100));
 
     const newActivityId = await startActivity({
       trainNumber: journey.trainNumber,
       origin: journey.origin.name,
       destination: journey.destination.name,
-      departureTime: format(new Date(journey.scheduledDeparture), 'HH:mm'),
+      departureTime: format(departure, 'HH:mm'),
       platform: journey.platform,
+      status: journey.status,
+      progress: progress,
+      delayMinutes: journey.delayMinutes || 0,
+      arrivalTime: format(arrival, 'HH:mm'),
+      timeRemaining: remaining > 0 ? `${Math.ceil(remaining / 60000)} min left` : 'Arrived',
     });
 
     if (newActivityId) {
       setActivityId(newActivityId);
+      setIsTracking(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Live Activity Started',
+        'Your journey is now being tracked on your Lock Screen and Dynamic Island.'
+      );
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        'Failed to Start',
+        'Could not start Live Activity. Please try again.'
+      );
     }
-  };
+  }, [journey, isSupported, startActivity]);
+
+  const handleStopTracking = useCallback(async () => {
+    if (!activityId) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const success = await endActivity(activityId);
+    if (success) {
+      setActivityId(null);
+      setIsTracking(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  }, [activityId, endActivity]);
+
+  const handleUpdateActivity = useCallback(async () => {
+    if (!activityId || !journey) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const now = new Date();
+    const departure = new Date(journey.scheduledDeparture);
+    const arrival = new Date(journey.scheduledArrival);
+    const totalDuration = arrival.getTime() - departure.getTime();
+    const remaining = arrival.getTime() - now.getTime();
+    const progress = Math.max(0, Math.min(100, ((totalDuration - remaining) / totalDuration) * 100));
+
+    const success = await updateActivity(activityId, {
+      status: journey.status,
+      progress: progress,
+      delayMinutes: journey.delayMinutes,
+      currentStation: journey.stops?.find((s) => s.status === 'DEPARTED')?.station.name,
+      timeRemaining: remaining > 0 ? `${Math.ceil(remaining / 60000)} min left` : 'Arrived',
+    });
+
+    if (success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }, [activityId, journey, updateActivity]);
 
   if (isLoading) {
     return (
@@ -168,7 +280,7 @@ export default function JourneyDetailScreen() {
         {/* Status Pill */}
         <View style={styles.statusPill}>
           <View style={[styles.statusDot, { backgroundColor: getStatusColor(journey.status) }]} />
-          <Text style={[styles.statusText, { color: getStatusColor(journey.status) }]}>
+          <Text style={[styles.statusText, { color: getStatusColor(journey.status) }]}
             {journey.status === 'ON_TIME'
               ? 'On time'
               : journey.status === 'DELAYED'
@@ -207,26 +319,58 @@ export default function JourneyDetailScreen() {
         </Animated.View>
       )}
 
-      {/* Track Button */}
+      {/* Live Activity Section */}
       {isSupported && (
         <Animated.View entering={FadeInUp.delay(300)}>
-          <TouchableOpacity
-            style={[
-              styles.trackButton,
-              activityId && styles.trackButtonActive,
-            ]}
-            onPress={handleTrackJourney}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name={activityId ? 'lock-closed' : 'lock-closed-outline'}
-              size={20}
-              color={COLORS.text}
-            />
-            <Text style={styles.trackButtonText}>
-              {activityId ? 'Tracking Active' : 'Track on Lock Screen'}
+          <View style={styles.liveActivityCard}>
+            <View style={styles.liveActivityHeader}>
+              <Ionicons name="lock-closed" size={20} color={COLORS.primary} />
+              <Text style={styles.liveActivityTitle}>Lock Screen Tracking</Text>
+              {isTracking && (
+                <View style={styles.trackingBadge}>
+                  <Text style={styles.trackingBadgeText}>ACTIVE</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.liveActivityDescription}>
+              {isTracking
+                ? 'This journey is being tracked on your Lock Screen and Dynamic Island. Long press the Dynamic Island to see more details.'
+                : 'Track this journey on your Lock Screen and Dynamic Island for quick access to departure time, platform, and live progress.'}
             </Text>
-          </TouchableOpacity>
+
+            <View style={styles.liveActivityButtons}>
+              {!isTracking ? (
+                <TouchableOpacity
+                  style={styles.trackButton}
+                  onPress={handleTrackJourney}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="play-circle" size={20} color={COLORS.text} />
+                  <Text style={styles.trackButtonText}>Start Tracking</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[styles.trackButton, styles.updateButton]}
+                    onPress={handleUpdateActivity}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="refresh" size={20} color={COLORS.text} />
+                    <Text style={styles.trackButtonText}>Update Now</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.trackButton, styles.stopButton]}
+                    onPress={handleStopTracking}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="stop-circle" size={20} color={COLORS.text} />
+                    <Text style={styles.trackButtonText}>Stop Tracking</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
         </Animated.View>
       )}
 
@@ -459,22 +603,68 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '700',
   },
+  liveActivityCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  liveActivityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  liveActivityTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    flex: 1,
+  },
+  trackingBadge: {
+    backgroundColor: COLORS.success,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  trackingBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  liveActivityDescription: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  liveActivityButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   trackButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
-    marginHorizontal: 16,
-    marginTop: 24,
-    paddingVertical: 16,
-    borderRadius: 14,
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
     gap: 8,
   },
-  trackButtonActive: {
-    backgroundColor: COLORS.success,
+  updateButton: {
+    backgroundColor: COLORS.info,
+    flex: 0.5,
+  },
+  stopButton: {
+    backgroundColor: COLORS.danger,
+    flex: 0.5,
   },
   trackButtonText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.text,
   },

@@ -1,13 +1,15 @@
 /**
  * TrainCard - Smart state-aware Flighty-style minimal row
  * Shows contextually relevant info based on journey phase
+ * Now with Live Activity support on press
  */
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -16,11 +18,14 @@ import { TrainJourney } from '../lib/types';
 import { COLORS } from '../lib/constants';
 import { StatusText } from './StatusText';
 import { useSmartState } from '../hooks/useSmartState';
+import { useLiveActivity } from '../hooks/useLiveActivity';
 import { JourneyState } from '../utils/smartState';
+import { Ionicons } from '@expo/vector-icons';
 
 interface TrainCardProps {
   journey: TrainJourney;
   index?: number;
+  onStartLiveActivity?: (journey: TrainJourney) => void;
 }
 
 const ACCENT_COLOR: Record<string, string> = {
@@ -33,9 +38,10 @@ const ACCENT_COLOR: Record<string, string> = {
   textSecondary: COLORS.textSecondary,
 };
 
-export function TrainCard({ journey, index = 0 }: TrainCardProps) {
+export function TrainCard({ journey, index = 0, onStartLiveActivity }: TrainCardProps) {
   const router = useRouter();
   const smartState = useSmartState(journey);
+  const { isSupported, startActivity, isLoading } = useLiveActivity();
 
   const departureTime = new Date(journey.scheduledDeparture);
   const timeStr = format(departureTime, 'HH:mm');
@@ -44,10 +50,52 @@ export function TrainCard({ journey, index = 0 }: TrainCardProps) {
   if (isToday(departureTime)) dateLabel = 'Today';
   if (isTomorrow(departureTime)) dateLabel = 'Tomorrow';
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/journey/${journey.id}`);
-  };
+  }, [router, journey.id]);
+
+  const handleLongPress = useCallback(async () => {
+    if (!isSupported) {
+      Alert.alert(
+        'Live Activities Not Available',
+        'Live Activities require iOS 16.1 or later.'
+      );
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Calculate time remaining
+    const now = new Date();
+    const departure = new Date(journey.scheduledDeparture);
+    const arrival = new Date(journey.scheduledArrival);
+    const totalDuration = arrival.getTime() - departure.getTime();
+    const remaining = arrival.getTime() - now.getTime();
+    const progress = Math.max(0, Math.min(100, ((totalDuration - remaining) / totalDuration) * 100));
+
+    const activityId = await startActivity({
+      trainNumber: journey.trainNumber,
+      origin: journey.origin.name,
+      destination: journey.destination.name,
+      departureTime: format(departure, 'HH:mm'),
+      platform: journey.platform,
+      status: journey.status,
+      progress: progress,
+      delayMinutes: journey.delayMinutes || 0,
+      arrivalTime: format(arrival, 'HH:mm'),
+      timeRemaining: remaining > 0 ? `${Math.ceil(remaining / 60000)} min left` : 'Arrived',
+    });
+
+    if (activityId) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (onStartLiveActivity) {
+        onStartLiveActivity(journey);
+      }
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  }, [isSupported, journey, startActivity, onStartLiveActivity]);
 
   // Active states get a colored left border accent
   const isActiveState = smartState && [
@@ -63,11 +111,16 @@ export function TrainCard({ journey, index = 0 }: TrainCardProps) {
     ? ACCENT_COLOR[smartState.content.accent] ?? COLORS.text
     : COLORS.text;
 
+  // Show Live Activity indicator if supported
+  const showLiveActivityIndicator = isSupported && isActiveState;
+
   return (
     <TouchableOpacity
       style={[styles.container, isActiveState && styles.containerActive]}
       onPress={handlePress}
+      onLongPress={handleLongPress}
       activeOpacity={0.7}
+      delayLongPress={500}
     >
       {/* Active state indicator */}
       {isActiveState && <View style={[styles.activePill, { backgroundColor: accentColor }]} />}
@@ -108,7 +161,17 @@ export function TrainCard({ journey, index = 0 }: TrainCardProps) {
           delayMinutes={journey.delayMinutes}
           style={styles.status}
         />
-        <Text style={styles.date}>{dateLabel}</Text>
+        <View style={styles.dateRow}>
+          {showLiveActivityIndicator && (
+            <Ionicons
+              name="lock-closed"
+              size={10}
+              color={COLORS.primary}
+              style={styles.liveActivityIcon}
+            />
+          )}
+          <Text style={styles.date}>{dateLabel}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -169,9 +232,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  liveActivityIcon: {
+    marginRight: 4,
+  },
   date: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    marginTop: 2,
   },
 });
