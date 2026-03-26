@@ -1,7 +1,7 @@
 /**
- * Search Screen - Add new journey
+ * Search Screen - Add new journey with real API integration
  */
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
@@ -18,6 +20,9 @@ import { useJourneyStore } from '../stores/journeyStore';
 import { Station, TrainJourney } from '../lib/types';
 import { COLORS } from '../lib/constants';
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBadge } from '../components/StatusBadge';
+import { NoResultsEmptyState, ErrorEmptyState } from '../components/EmptyState';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -29,12 +34,19 @@ export default function SearchScreen() {
   const [toStation, setToStation] = useState<Station | null>(null);
   const [showFromResults, setShowFromResults] = useState(false);
   const [showToResults, setShowToResults] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  const { data: fromResults, isLoading: isLoadingFrom } = useStationSearch(fromQuery);
-  const { data: toResults, isLoading: isLoadingTo } = useStationSearch(toQuery);
-  const { data: searchResults, isLoading: isSearching } = useJourneySearch(
+  const { data: fromResults, isLoading: isLoadingFrom, error: fromError } = useStationSearch(fromQuery);
+  const { data: toResults, isLoading: isLoadingTo, error: toError } = useStationSearch(toQuery);
+  const { 
+    data: searchResults, 
+    isLoading: isSearching,
+    error: searchError,
+    refetch: refetchJourneys,
+  } = useJourneySearch(
     fromStation?.id || '',
-    toStation?.id || ''
+    toStation?.id || '',
+    selectedDate
   );
 
   const handleSelectFrom = (station: Station) => {
@@ -54,19 +66,37 @@ export default function SearchScreen() {
     router.push(`/journey/${journey.id}`);
   };
 
+  const swapStations = () => {
+    const tempStation = fromStation;
+    const tempQuery = fromQuery;
+    setFromStation(toStation);
+    setFromQuery(toQuery);
+    setToStation(tempStation);
+    setToQuery(tempQuery);
+  };
+
+  const hasError = fromError || toError || searchError;
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
       {/* Header */}
-      <View style={styles.header}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
         <Text style={styles.title}>Search Journey</Text>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="close" size={28} color={COLORS.textSecondary} />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* From Input */}
-        <View style={styles.inputContainer}>
+        <Animated.View entering={FadeInUp.delay(100)} style={styles.inputContainer}>
           <Text style={styles.inputLabel}>From</Text>
           <View style={styles.inputWrapper}>
             <Ionicons
@@ -87,7 +117,13 @@ export default function SearchScreen() {
                   setFromStation(null);
                 }
               }}
+              autoFocus
             />
+            {fromQuery.length > 0 && (
+              <TouchableOpacity onPress={() => { setFromQuery(''); setFromStation(null); }}>
+                <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* From Results */}
@@ -102,7 +138,10 @@ export default function SearchScreen() {
                     style={styles.resultItem}
                     onPress={() => handleSelectFrom(station)}
                   >
-                    <Text style={styles.resultText}>{station.name}</Text>
+                    <View style={styles.resultContent}>
+                      <Ionicons name="location" size={18} color={COLORS.primary} />
+                      <Text style={styles.resultText}>{station.name}</Text>
+                    </View>
                     <Ionicons
                       name="chevron-forward"
                       size={16}
@@ -115,10 +154,17 @@ export default function SearchScreen() {
               )}
             </View>
           )}
-        </View>
+        </Animated.View>
+
+        {/* Swap Button */}
+        <Animated.View entering={FadeInUp.delay(150)} style={styles.swapContainer}>
+          <TouchableOpacity style={styles.swapButton} onPress={swapStations}>
+            <Ionicons name="swap-vertical" size={24} color={COLORS.primary} />
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* To Input */}
-        <View style={styles.inputContainer}>
+        <Animated.View entering={FadeInUp.delay(200)} style={styles.inputContainer}>
           <Text style={styles.inputLabel}>To</Text>
           <View style={styles.inputWrapper}>
             <Ionicons
@@ -140,6 +186,11 @@ export default function SearchScreen() {
                 }
               }}
             />
+            {toQuery.length > 0 && (
+              <TouchableOpacity onPress={() => { setToQuery(''); setToStation(null); }}>
+                <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* To Results */}
@@ -154,7 +205,10 @@ export default function SearchScreen() {
                     style={styles.resultItem}
                     onPress={() => handleSelectTo(station)}
                   >
-                    <Text style={styles.resultText}>{station.name}</Text>
+                    <View style={styles.resultContent}>
+                      <Ionicons name="location" size={18} color={COLORS.danger} />
+                      <Text style={styles.resultText}>{station.name}</Text>
+                    </View>
                     <Ionicons
                       name="chevron-forward"
                       size={16}
@@ -167,84 +221,110 @@ export default function SearchScreen() {
               )}
             </View>
           )}
-        </View>
+        </Animated.View>
 
         {/* Search Results */}
         {fromStation && toStation && (
-          <View style={styles.searchResults}>
-            <Text style={styles.resultsTitle}>
-              {fromStation.name} → {toStation.name}
-            </Text>
+          <Animated.View entering={FadeInUp.delay(300)} style={styles.searchResults}>
+            <View style={styles.resultsHeader}>
+              <Text style={styles.resultsTitle}>
+                {fromStation.name} → {toStation.name}
+              </Text>
+              <Text style={styles.resultsDate}>
+                {format(selectedDate, 'EEEE, MMM d')}
+              </Text>
+            </View>
 
             {isSearching ? (
-              <ActivityIndicator color={COLORS.primary} style={styles.loader} />
-            ) : searchResults?.journeys ? (
-              searchResults.journeys.map((journey) => (
-                <TouchableOpacity
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loaderText}>Searching journeys...</Text>
+              </View>
+            ) : searchError ? (
+              <ErrorEmptyState 
+                message="Couldn't search for journeys"
+                onRetry={() => refetchJourneys()}
+              />
+            ) : searchResults?.journeys && searchResults.journeys.length > 0 ? (
+              searchResults.journeys.map((journey, index) => (
+                <Animated.View 
                   key={journey.id}
-                  style={styles.journeyCard}
-                  onPress={() => handleAddJourney(journey)}
+                  entering={FadeInUp.delay(index * 100)}
                 >
-                  <View style={styles.journeyHeader}>
-                    <View style={styles.trainBadge}>
-                      <Text style={styles.trainNumber}>
-                        {journey.trainNumber}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.journeyStatus,
-                        {
-                          color:
-                            journey.status === 'ON_TIME'
-                              ? COLORS.success
-                              : COLORS.warning,
-                        },
-                      ]}
-                    >
-                      {journey.status === 'ON_TIME' ? 'On time' : 'Delayed'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.journeyTimes}>
-                    <View style={styles.timeColumn}>
-                      <Text style={styles.timeValue}>
-                        {format(new Date(journey.scheduledDeparture), 'HH:mm')}
-                      </Text>
-                      <Text style={styles.timeLabel}>Departure</Text>
+                  <TouchableOpacity
+                    style={styles.journeyCard}
+                    onPress={() => handleAddJourney(journey)}
+                  >
+                    <View style={styles.journeyHeader}>
+                      <View style={styles.trainBadge}>
+                        <Text style={styles.trainNumber}>
+                          {journey.trainNumber}
+                        </Text>
+                      </View>
+                      <StatusBadge status={journey.status} delayMinutes={journey.delayMinutes} size="small" />
                     </View>
 
-                    <View style={styles.durationColumn}>
-                      <Ionicons
-                        name="arrow-forward"
-                        size={20}
-                        color={COLORS.textSecondary}
-                      />
+                    <View style={styles.journeyTimes}>
+                      <View style={styles.timeColumn}>
+                        <Text style={styles.timeValue}>
+                          {format(new Date(journey.scheduledDeparture), 'HH:mm')}
+                        </Text>
+                        <Text style={styles.timeLabel}>Departure</Text>
+                      </View>
+
+                      <View style={styles.durationColumn}>
+                        <View style={styles.durationLine} />
+                        <Ionicons
+                          name="arrow-forward"
+                          size={16}
+                          color={COLORS.textSecondary}
+                        />
+                        <Text style={styles.durationText}>
+                          {Math.round((new Date(journey.scheduledArrival).getTime() - 
+                            new Date(journey.scheduledDeparture).getTime()) / 60000)} min
+                        </Text>
+                      </View>
+
+                      <View style={styles.timeColumn}>
+                        <Text style={styles.timeValue}>
+                          {format(new Date(journey.scheduledArrival), 'HH:mm')}
+                        </Text>
+                        <Text style={styles.timeLabel}>Arrival</Text>
+                      </View>
+
+                      <View style={styles.platformColumn}>
+                        <Text style={styles.platformValue}>
+                          {journey.platform}
+                        </Text>
+                        <Text style={styles.platformLabel}>Platform</Text>
+                      </View>
                     </View>
 
-                    <View style={styles.timeColumn}>
-                      <Text style={styles.timeValue}>
-                        {format(new Date(journey.scheduledArrival), 'HH:mm')}
+                    <View style={styles.journeyFooter}>
+                      <Ionicons name="information-circle-outline" size={16} color={COLORS.textTertiary} />
+                      <Text style={styles.journeyFooterText}>
+                        Tap to track this journey
                       </Text>
-                      <Text style={styles.timeLabel}>Arrival</Text>
                     </View>
-
-                    <View style={styles.platformColumn}>
-                      <Text style={styles.platformValue}>
-                        {journey.platform}
-                      </Text>
-                      <Text style={styles.platformLabel}>Platform</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </Animated.View>
               ))
             ) : (
-              <Text style={styles.noJourneys}>No journeys found</Text>
+              <NoResultsEmptyState 
+                onClear={() => {
+                  setFromStation(null);
+                  setFromQuery('');
+                  setToStation(null);
+                  setToQuery('');
+                }}
+              />
             )}
-          </View>
+          </Animated.View>
         )}
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -263,7 +343,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.text,
     letterSpacing: -0.5,
   },
@@ -272,23 +352,25 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   inputLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 50,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 54,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   inputIcon: {
     marginRight: 12,
@@ -297,12 +379,34 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.text,
     fontSize: 17,
+    fontWeight: '500',
+  },
+  swapContainer: {
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  swapButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   resultsContainer: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
+    borderRadius: 14,
     marginTop: 8,
     padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   resultItem: {
     flexDirection: 'row',
@@ -313,9 +417,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#2C2C2E',
   },
+  resultContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   resultText: {
     color: COLORS.text,
     fontSize: 16,
+    fontWeight: '500',
   },
   noResults: {
     color: COLORS.textSecondary,
@@ -324,43 +434,54 @@ const styles = StyleSheet.create({
   },
   searchResults: {
     paddingHorizontal: 20,
-    marginTop: 16,
+    marginTop: 24,
   },
-  resultsTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: COLORS.text,
+  resultsHeader: {
     marginBottom: 16,
   },
-  loader: {
-    marginTop: 32,
+  resultsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  resultsDate: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  loaderContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loaderText: {
+    color: COLORS.textSecondary,
+    marginTop: 16,
+    fontSize: 15,
   },
   journeyCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 18,
+    padding: 18,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   journeyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   trainBadge: {
     backgroundColor: 'rgba(0,122,255,0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   trainNumber: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.primary,
-  },
-  journeyStatus: {
-    fontSize: 15,
-    fontWeight: '600',
   },
   journeyTimes: {
     flexDirection: 'row',
@@ -371,8 +492,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timeValue: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: 26,
+    fontWeight: '700',
     color: COLORS.text,
     fontVariant: ['tabular-nums'],
   },
@@ -380,16 +501,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   durationColumn: {
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: 12,
+  },
+  durationLine: {
+    position: 'absolute',
+    top: 12,
+    left: 20,
+    right: 20,
+    height: 2,
+    backgroundColor: COLORS.border,
+  },
+  durationText: {
+    fontSize: 11,
+    color: COLORS.textTertiary,
+    marginTop: 4,
   },
   platformColumn: {
     alignItems: 'center',
   },
   platformValue: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     color: COLORS.primary,
     fontVariant: ['tabular-nums'],
   },
@@ -397,10 +535,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  noJourneys: {
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    padding: 32,
+  journeyFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+    gap: 6,
+  },
+  journeyFooterText: {
+    fontSize: 13,
+    color: COLORS.textTertiary,
+  },
+  bottomPadding: {
+    height: 100,
   },
 });
