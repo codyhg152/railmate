@@ -43,23 +43,23 @@ export class UserService {
     );
   }
 
-  private mapUser(row: any): User {
+  private mapUser(row: Record<string, unknown>): User {
     return {
-      id: row.id,
-      email: row.email,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
+      id: row.id as string,
+      email: row.email as string | undefined,
+      createdAt: new Date(row.created_at as string),
+      updatedAt: new Date(row.updated_at as string),
     };
   }
 
-  private mapPushToken(row: any): PushToken {
+  private mapPushToken(row: Record<string, unknown>): PushToken {
     return {
-      id: row.id,
-      userId: row.user_id,
-      token: row.token,
-      platform: row.platform,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
+      id: row.id as string,
+      userId: row.user_id as string,
+      token: row.token as string,
+      platform: row.platform as 'ios' | 'android' | 'web',
+      createdAt: new Date(row.created_at as string),
+      updatedAt: new Date(row.updated_at as string),
     };
   }
 }

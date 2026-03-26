@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  background: #000000;
+  color: #FFFFFF;
+  width: 390px;
+  height: 844px;
+  overflow: hidden;
+}
+.status-bar {
+  height: 47px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 29px 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.header {
+  padding: 8px 20px 16px;
+}
+.station-name {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+.station-subtitle {
+  font-size: 15px;
+  color: #8E8E93;
+}
+.tabs {
+  display: flex;
+  padding: 0 16px;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.tab {
+  flex: 1;
+  padding: 10px 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: #8E8E93;
+  background: #1C1C1E;
+  border-radius: 10px;
+}
+.tab.active {
+  background: #007AFF;
+  color: #FFFFFF;
+}
+.board-container {
+  background: #0A0A0A;
+  margin: 0 16px;
+  border-radius: 12px;
+  border: 1px solid #1C1C1E;
+  overflow: hidden;
+}
+.board-header {
+  display: grid;
+  grid-template-columns: 60px 70px 1fr 70px;
+  padding: 12px 16px;
+  background: #1C1C1E;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.board-row {
+  display: grid;
+  grid-template-columns: 60px 70px 1fr 70px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #1C1C1E;
+  align-items: center;
+}
+.board-row:last-child {
+  border-bottom: none;
+}
+.board-row.cancelled {
+  opacity: 0.5;
+}
+.col-time {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-family: 'SF Mono', SFMono-Regular, monospace;
+}
+.col-train {
+  font-size: 13px;
+  font-weight: 600;
+}
+.col-train .train-type {
+  color: #007AFF;
+}
+.col-train .train-num {
+  color: #FFFFFF;
+}
+.col-dest {
+  font-size: 15px;
+  font-weight: 500;
+}
+.col-dest .dest-city {
+  color: #FFFFFF;
+}
+.col-dest .dest-status {
+  font-size: 12px;
+  margin-top: 2px;
+}
+.col-dest .dest-status.on-time {
+  color: #34C759;
+}
+.col-dest .dest-status.delayed {
+  color: #FF9500;
+}
+.col-dest .dest-status.cancelled {
+  color: #FF3B30;
+}
+.col-platform {
+  text-align: right;
+}
+.platform-num {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'SF Mono', SFMono-Regular, monospace;
+  color: #007AFF;
+}
+.platform-status {
+  font-size: 11px;
+  margin-top: 2px;
+}
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.checkmark {
+  color: #34C759;
+}
+.warning {
+  color: #FF9500;
+}
+.cancelled-badge {
+  background: #FF3B30;
+  color: #FFFFFF;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.update-banner {
+  background: #1C1C1E;
+  margin: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.update-icon {
+  width: 8px;
+  height: 8px;
+  background: #34C759;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.update-text {
+  font-size: 13px;
+  color: #8E8E93;
+}
+.update-time {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+.bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 83px;
+  background: rgba(0,0,0,0.9);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid #1C1C1E;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  padding-top: 8px;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+}
+.nav-item .nav-icon {
+  font-size: 22px;
+  color: #8E8E93;
+}
+.nav-item .nav-label {
+  font-size: 10px;
+  color: #8E8E93;
+  font-weight: 500;
+}
+</style>
+</head>
+<body>
+<div class="status-bar">
+  <span>9:41</span>
+  <span>●●●●●</span>
+</div>
+<div class="header">
+  <div class="station-name">Berlin Hbf</div>
+  <div class="station-subtitle">Central Station • Germany</div>
+</div>
+<div class="tabs">
+  <div class="tab active">Departures</div>
+  <div class="tab">Arrivals</div>
+  <div class="tab">Info</div>
+</div>
+<div class="board-container">
+  <div class="board-header">
+    <span>Time</span>
+    <span>Train</span>
+    <span>Destination</span>
+    <span style="text-align:right">Plat</span>
+  </div>
+  <div class="board-row">
+    <span class="col-time">14:35</span>
+    <span class="col-train"><span class="train-type">ICE</span> <span class="train-num">123</span></span>
+    <span class="col-dest">
+      <span class="dest-city">Munich</span>
+      <div class="dest-status on-time">
+        <span class="status-indicator"><span class="checkmark">✓</span> On time</span>
+      </div>
+    </span>
+    <span class="col-platform">
+      <span class="platform-num">5</span>
+    </span>
+  </div>
+  <div class="board-row">
+    <span class="col-time">14:50</span>
+    <span class="col-train"><span class="train-type">ICE</span> <span class="train-num">789</span></span>
+    <span class="col-dest">
+      <span class="dest-city">Hamburg</span>
+      <div class="dest-status delayed">
+        <span class="status-indicator"><span class="warning">!</span> +10 min</span>
+      </div>
+    </span>
+    <span class="col-platform">
+      <span class="platform-num">8</span>
+      <div class="platform-status" style="color:#FF9500">Delayed</div>
+    </span>
+  </div>
+  <div class="board-row cancelled">
+    <span class="col-time">15:00</span>
+    <span class="col-train"><span class="train-type">IC</span> <span class="train-num">234</span></span>
+    <span class="col-dest">
+      <span class="dest-city">Dresden</span>
+      <div class="dest-status cancelled">
+        <span class="cancelled-badge">Cancelled</span>
+      </div>
+    </span>
+    <span class="col-platform">
+      <span class="platform-num" style="color:#8E8E93">12</span>
+    </span>
+  </div>
+  <div class="board-row">
+    <span class="col-time">15:15</span>
+    <span class="col-train"><span class="train-type">ICE</span> <span class="train-num">567</span></span>
+    <span class="col-dest">
+      <span class="dest-city">Frankfurt</span>
+      <div class="dest-status on-time">
+        <span class="status-indicator"><span class="checkmark">✓</span> On time</span>
+      </div>
+    </span>
+    <span class="col-platform">
+      <span class="platform-num">3</span>
+    </span>
+  </div>
+  <div class="board-row">
+    <span class="col-time">15:30</span>
+    <span class="col-train"><span class="train-type">RE</span> <span class="train-num">4321</span></span>
+    <span class="col-dest">
+      <span class="dest-city">Potsdam</span>
+      <div class="dest-status on-time">
+        <span class="status-indicator"><span class="checkmark">✓</span> On time</span>
+      </div>
+    </span>
+    <span class="col-platform">
+      <span class="platform-num">15</span>
+    </span>
+  </div>
+</div>
+<div class="update-banner">
+  <div class="update-icon"></div>
+  <span class="update-text">Last updated: <span class="update-time">14:32</span></span>
+</div>
+<div class="bottom-nav">
+  <div class="nav-item">
+    <span class="nav-icon">◐</span>
+    <span class="nav-label">My Trains</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon" style="color:#007AFF">▤</span>
+    <span class="nav-label" style="color:#007AFF">Stations</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">✈</span>
+    <span class="nav-label">Passport</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">☰</span>
+    <span class="nav-label">More</span>
+  </div>
+</div>
+</body>
+</html>

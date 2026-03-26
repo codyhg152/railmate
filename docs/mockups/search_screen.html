@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  background: #000000;
+  color: #FFFFFF;
+  width: 390px;
+  height: 844px;
+  overflow: hidden;
+}
+.status-bar {
+  height: 47px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 29px 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.nav-header {
+  padding: 8px 16px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.back-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #1C1C1E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #007AFF;
+}
+.nav-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+.form-container {
+  padding: 8px 16px;
+}
+.input-group {
+  background: #1C1C1E;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.input-row {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #2C2C2E;
+}
+.input-row:last-child {
+  border-bottom: none;
+}
+.input-label {
+  width: 60px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.input-value {
+  flex: 1;
+  font-size: 17px;
+  font-weight: 500;
+}
+.input-value.placeholder {
+  color: #8E8E93;
+}
+.swap-btn {
+  width: 32px;
+  height: 32px;
+  background: #2C2C2E;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #007AFF;
+}
+.date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+}
+.date-label {
+  font-size: 17px;
+  font-weight: 500;
+}
+.date-value {
+  font-size: 17px;
+  color: #007AFF;
+  font-weight: 500;
+}
+.search-btn {
+  background: #007AFF;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 600;
+  width: 100%;
+  margin-top: 8px;
+}
+.results-header {
+  padding: 24px 16px 12px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.results-subtitle {
+  padding: 0 16px 16px;
+  font-size: 15px;
+  color: #8E8E93;
+}
+.result-card {
+  background: #1C1C1E;
+  border-radius: 16px;
+  margin: 0 16px 12px;
+  padding: 16px;
+}
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.train-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.train-icon {
+  width: 32px;
+  height: 32px;
+  background: rgba(0,122,255,0.15);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.train-info {
+  display: flex;
+  flex-direction: column;
+}
+.train-type {
+  font-size: 15px;
+  font-weight: 700;
+  color: #007AFF;
+}
+.train-number {
+  font-size: 13px;
+  color: #8E8E93;
+}
+.price {
+  font-size: 20px;
+  font-weight: 700;
+}
+.result-times {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.time-box {
+  text-align: center;
+}
+.time-dep {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.time-arr {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #8E8E93;
+}
+.time-station {
+  font-size: 13px;
+  color: #8E8E93;
+  margin-top: 2px;
+}
+.time-arrow {
+  flex: 1;
+  height: 2px;
+  background: #3A3A3C;
+  position: relative;
+  margin: 0 8px;
+}
+.time-arrow::after {
+  content: '›';
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-60%);
+  color: #3A3A3C;
+  font-size: 14px;
+}
+.duration-pill {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2C2C2E;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #8E8E93;
+  white-space: nowrap;
+}
+.result-meta {
+  display: flex;
+  gap: 12px;
+}
+.meta-tag {
+  background: #2C2C2E;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #8E8E93;
+}
+.meta-tag.direct {
+  background: rgba(52,199,89,0.15);
+  color: #34C759;
+}
+</style>
+</head>
+<body>
+<div class="status-bar">
+  <span>9:41</span>
+  <span>●●●●●</span>
+</div>
+<div class="nav-header">
+  <div class="back-btn">‹</div>
+  <span class="nav-title">Add Journey</span>
+</div>
+<div class="form-container">
+  <div class="input-group">
+    <div class="input-row">
+      <span class="input-label">From</span>
+      <span class="input-value">Berlin Hbf</span>
+      <div class="swap-btn">⇅</div>
+    </div>
+    <div class="input-row">
+      <span class="input-label">To</span>
+      <span class="input-value">Munich Hbf</span>
+    </div>
+  </div>
+  <div class="input-group">
+    <div class="date-row">
+      <span class="date-label">Date</span>
+      <span class="date-value">Today ›</span>
+    </div>
+  </div>
+  <button class="search-btn">Search Trains</button>
+</div>
+<div class="results-header">Results</div>
+<div class="results-subtitle">3 trains found for Thu, Mar 26</div>
+<div class="result-card">
+  <div class="result-header">
+    <div class="train-badge">
+      <div class="train-icon">🚄</div>
+      <div class="train-info">
+        <span class="train-type">ICE 123</span>
+        <span class="train-number">Deutsche Bahn</span>
+      </div>
+    </div>
+    <span class="price">€89.90</span>
+  </div>
+  <div class="result-times">
+    <div class="time-box">
+      <div class="time-dep">14:35</div>
+      <div class="time-station">Berlin</div>
+    </div>
+    <div class="time-arrow">
+      <span class="duration-pill">4h 40m</span>
+    </div>
+    <div class="time-box">
+      <div class="time-arr">19:15</div>
+      <div class="time-station">Munich</div>
+    </div>
+  </div>
+  <div class="result-meta">
+    <span class="meta-tag direct">✓ Direct</span>
+    <span class="meta-tag">1st class available</span>
+  </div>
+</div>
+<div class="result-card">
+  <div class="result-header">
+    <div class="train-badge">
+      <div class="train-icon" style="background:rgba(255,149,0,0.15)">🚆</div>
+      <div class="train-info">
+        <span class="train-type" style="color:#FF9500">IC 456</span>
+        <span class="train-number">Deutsche Bahn</span>
+      </div>
+    </div>
+    <span class="price">€49.90</span>
+  </div>
+  <div class="result-times">
+    <div class="time-box">
+      <div class="time-dep">15:20</div>
+      <div class="time-station">Berlin</div>
+    </div>
+    <div class="time-arrow">
+      <span class="duration-pill">5h 40m</span>
+    </div>
+    <div class="time-box">
+      <div class="time-arr">21:00</div>
+      <div class="time-station">Munich</div>
+    </div>
+  </div>
+  <div class="result-meta">
+    <span class="meta-tag">1 change</span>
+    <span class="meta-tag">Leipzig Hbf</span>
+  </div>
+</div>
+</body>
+</html>

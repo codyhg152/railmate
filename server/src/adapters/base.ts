@@ -1,10 +1,10 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { redis } from './database';
+import { redis } from '../utils/database';
 import { Station, Departure, Journey, TrainJourney, JourneyStatus } from '../types';
 
 export abstract class BaseTrainAdapter {
   protected client: AxiosInstance;
-  protected name: string;
+  public name: string;
   protected baseURL: string;
   protected rateLimitPerMinute: number;
   private requestTimestamps: number[] = [];

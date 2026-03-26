@@ -60,18 +60,18 @@ export class JourneyService {
     );
   }
 
-  private mapJourney(row: any): SavedJourney {
+  private mapJourney(row: Record<string, unknown>): SavedJourney {
     return {
-      id: row.id,
-      userId: row.user_id,
-      originId: row.origin_id,
-      destinationId: row.destination_id,
-      scheduledDeparture: new Date(row.scheduled_departure),
-      trainNumber: row.train_number,
-      operator: row.operator,
-      status: row.status,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
+      id: row.id as string,
+      userId: row.user_id as string,
+      originId: row.origin_id as string,
+      destinationId: row.destination_id as string,
+      scheduledDeparture: new Date(row.scheduled_departure as string),
+      trainNumber: row.train_number as string | undefined,
+      operator: row.operator as string | undefined,
+      status: row.status as string,
+      createdAt: new Date(row.created_at as string),
+      updatedAt: new Date(row.updated_at as string),
     };
   }
 }

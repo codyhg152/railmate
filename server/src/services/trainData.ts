@@ -1,7 +1,7 @@
-import { DeutscheBahnAdapter } from './deutschebahn';
-import { SNCFAdapter } from './sncf';
-import { NationalRailAdapter } from './nationalrail';
-import { BaseTrainAdapter } from './base';
+import { DeutscheBahnAdapter } from '../adapters/deutschebahn';
+import { SNCFAdapter } from '../adapters/sncf';
+import { NationalRailAdapter } from '../adapters/nationalrail';
+import { BaseTrainAdapter } from '../adapters/base';
 import { Station, Departure, Journey, TrainJourney } from '../types';
 
 export class TrainDataService {

@@ -1,6 +1,6 @@
 /**
  * Home / My Trains screen
- * Shows saved journeys with beautiful train cards
+ * Shows saved journeys with beautiful train cards and pull-to-refresh
  */
 import React from 'react';
 import {
@@ -9,43 +9,85 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useJourneyStore } from '../../stores/journeyStore';
 import { TrainCard } from '../../components/TrainCard';
+import { TrainCardSkeleton } from '../../components/SkeletonLoader';
+import { NoJourneysEmptyState, ErrorEmptyState } from '../../components/EmptyState';
 import { COLORS } from '../../lib/constants';
-import { format } from 'date-fns';
+import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 
 export default function HomeScreen() {
   const router = useRouter();
   const savedJourneys = useJourneyStore((state) => state.savedJourneys);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const handleAddJourney = () => {
     router.push('/search');
   };
 
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    // Simulate refresh - in real app, would refresh journey data
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setRefreshing(false);
+  }, []);
+
   // Group journeys by date
   const today = new Date();
   const todaysJourneys = savedJourneys.filter((j) => {
     const depDate = new Date(j.scheduledDeparture);
-    return (
-      depDate.getDate() === today.getDate() &&
-      depDate.getMonth() === today.getMonth() &&
-      depDate.getFullYear() === today.getFullYear()
-    );
+    return isToday(depDate);
   });
 
   const upcomingJourneys = savedJourneys.filter((j) => {
     const depDate = new Date(j.scheduledDeparture);
-    return depDate > today && !todaysJourneys.includes(j);
+    return isFuture(depDate) && !isToday(depDate);
   });
+
+  const pastJourneys = savedJourneys.filter((j) => {
+    const depDate = new Date(j.scheduledDeparture);
+    return isPast(depDate) && !isToday(depDate);
+  });
+
+  // Active journeys (departed but not arrived)
+  const activeJourneys = savedJourneys.filter((j) => 
+    j.status === 'DEPARTED' || j.status === 'BOARDING'
+  );
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Railmate</Text>
+        </View>
+        <ScrollView style={styles.scrollView}>
+          {[1, 2, 3].map((i) => (
+            <TrainCardSkeleton key={i} />
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       {/* Header with Add Button */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Railmate</Text>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+        <View>
+          <Text style={styles.title}>Railmate</Text>
+          <Text style={styles.subtitle}>
+            {savedJourneys.length > 0 
+              ? `${savedJourneys.length} journey${savedJourneys.length !== 1 ? 'ies' : 'y'} tracked`
+              : 'Track your trains'
+            }
+          </Text>
+        </View>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddJourney}
@@ -53,53 +95,92 @@ export default function HomeScreen() {
         >
           <Ionicons name="add" size={28} color={COLORS.primary} />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
       >
+        {/* Active Journeys */}
+        {activeJourneys.length > 0 && (
+          <Animated.View entering={FadeInUp.delay(100)}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.sectionTitle}>ACTIVE NOW</Text>
+              </View>
+            </View>
+            {activeJourneys.map((journey, index) => (
+              <TrainCard 
+                key={journey.id} 
+                journey={journey} 
+                index={index}
+              />
+            ))}
+          </Animated.View>
+        )}
+
         {/* Today's Journeys */}
         {todaysJourneys.length > 0 && (
-          <>
+          <Animated.View entering={FadeInUp.delay(200)}>
             <Text style={styles.sectionTitle}>TODAY</Text>
-            {todaysJourneys.map((journey) => (
-              <TrainCard key={journey.id} journey={journey} />
+            {todaysJourneys.map((journey, index) => (
+              <TrainCard 
+                key={journey.id} 
+                journey={journey} 
+                index={index + activeJourneys.length}
+              />
             ))}
-          </>
+          </Animated.View>
         )}
 
         {/* Upcoming Journeys */}
         {upcomingJourneys.length > 0 && (
-          <>
+          <Animated.View entering={FadeInUp.delay(300)}>
             <Text style={styles.sectionTitle}>UPCOMING</Text>
-            {upcomingJourneys.map((journey) => (
-              <TrainCard key={journey.id} journey={journey} />
+            {upcomingJourneys.map((journey, index) => (
+              <TrainCard 
+                key={journey.id} 
+                journey={journey}
+                index={index + activeJourneys.length + todaysJourneys.length}
+              />
             ))}
-          </>
+          </Animated.View>
+        )}
+
+        {/* Past Journeys */}
+        {pastJourneys.length > 0 && (
+          <Animated.View entering={FadeInUp.delay(400)}>
+            <Text style={styles.sectionTitle}>PAST</Text>
+            {pastJourneys.slice(0, 3).map((journey, index) => (
+              <TrainCard 
+                key={journey.id} 
+                journey={journey}
+                showProgress={false}
+                index={index + activeJourneys.length + todaysJourneys.length + upcomingJourneys.length}
+              />
+            ))}
+          </Animated.View>
         )}
 
         {/* Empty State */}
         {savedJourneys.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons
-              name="train-outline"
-              size={64}
-              color={COLORS.textSecondary}
-            />
-            <Text style={styles.emptyTitle}>No journeys yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Tap the + button to add your first train journey
-            </Text>
-            <TouchableOpacity
-              style={styles.emptyButton}
-              onPress={handleAddJourney}
-            >
-              <Text style={styles.emptyButtonText}>Add Journey</Text>
-            </TouchableOpacity>
-          </View>
+          <Animated.View entering={FadeInUp.delay(200)} style={styles.emptyContainer}>
+            <NoJourneysEmptyState onAdd={handleAddJourney} />
+          </Animated.View>
         )}
+
+        {/* Bottom padding */}
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </View>
   );
@@ -113,24 +194,31 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 16,
   },
   title: {
     fontSize: 34,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.text,
     letterSpacing: -0.5,
   },
+  subtitle: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: COLORS.card,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   scrollView: {
     flex: 1,
@@ -138,46 +226,37 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
+  sectionHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.danger,
+  },
   sectionTitle: {
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 12,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
-  emptyState: {
+  emptyContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 100,
-    paddingHorizontal: 40,
+    marginTop: 40,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  emptyButton: {
-    marginTop: 24,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  emptyButtonText: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '600',
+  bottomPadding: {
+    height: 100,
   },
 });

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=railmate
+      - POSTGRES_USER=railmate
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-railmate}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SNCF_API_TOKEN=${SNCF_API_TOKEN:-}
+      - NATIONAL_RAIL_API_TOKEN=${NATIONAL_RAIL_API_TOKEN:-}
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - railmate-network
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=railmate
+      - POSTGRES_USER=railmate
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-railmate}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U railmate -d railmate"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - railmate-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - railmate-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  railmate-network:
+    driver: bridge

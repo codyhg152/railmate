@@ -1,28 +1,41 @@
 /**
  * Journey Detail Screen
- * Shows detailed journey information with live progress
+ * Shows detailed journey information with live progress and timeline
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import { useJourneyDetails } from '../../hooks/useJourneys';
+import { useJourneyDetails, usePullToRefresh } from '../../hooks/useJourneys';
 import { useLiveActivity } from '../../hooks/useLiveActivity';
 import { useJourneyStore } from '../../stores/journeyStore';
 import { StatusBadge } from '../../components/StatusBadge';
+import { ProgressBar } from '../../components/ProgressBar';
+import { JourneyTimeline } from '../../components/JourneyTimeline';
+import { JourneyDetailSkeleton } from '../../components/SkeletonLoader';
+import { ErrorEmptyState } from '../../components/EmptyState';
 import { COLORS } from '../../lib/constants';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 
 export default function JourneyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { data: journey, isLoading } = useJourneyDetails(id);
+  const { 
+    data: journey, 
+    isLoading,
+    isError,
+    error,
+    refresh,
+    isRefreshing,
+  } = useJourneyDetails(id);
   const { isSupported, startActivity, updateActivity } = useLiveActivity();
   const addJourney = useJourneyStore((state) => state.addJourney);
   const [activityId, setActivityId] = React.useState<string | null>(null);
@@ -49,10 +62,26 @@ export default function JourneyDetailScreen() {
     }
   };
 
-  if (isLoading || !journey) {
+  if (isLoading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading journey...</Text>
+        <JourneyDetailSkeleton />
+      </View>
+    );
+  }
+
+  if (isError || !journey) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorHeader}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
+        <ErrorEmptyState 
+          message={error?.message || "Couldn't load journey details"}
+          onRetry={refresh}
+        />
       </View>
     );
   }
@@ -63,12 +92,38 @@ export default function JourneyDetailScreen() {
     (arrivalTime.getTime() - departureTime.getTime()) / 60000
   );
 
+  const isActive = journey.status === 'DEPARTED' || journey.status === 'BOARDING';
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={refresh}
+          tintColor={COLORS.primary}
+          colors={[COLORS.primary]}
+        />
+      }
+    >
+      {/* Back Button */}
+      <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={refresh} style={styles.refreshButton}>
+          <Ionicons name="refresh" size={20} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+      </Animated.View>
+
       {/* Hero Section */}
-      <View style={styles.hero}>
+      <Animated.View entering={FadeInUp.delay(100)} style={styles.hero}>
         <View style={styles.trainBadge}>
           <Text style={styles.trainNumber}>{journey.trainNumber}</Text>
+          {journey.operator && (
+            <Text style={styles.operator}>{journey.operator}</Text>
+          )}
         </View>
 
         <Text style={styles.routeLarge}>
@@ -77,7 +132,7 @@ export default function JourneyDetailScreen() {
           {journey.destination.name.split(' ')[0]}
         </Text>
 
-        {/* Timeline */}
+        {/* Timeline Hero */}
         <View style={styles.timelineHero}>
           <View style={styles.timeBox}>
             <Text style={styles.timeValue}>{format(departureTime, 'HH:mm')}</Text>
@@ -112,8 +167,8 @@ export default function JourneyDetailScreen() {
 
         {/* Status Pill */}
         <View style={styles.statusPill}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>
+          <View style={[styles.statusDot, { backgroundColor: getStatusColor(journey.status) }]} />
+          <Text style={[styles.statusText, { color: getStatusColor(journey.status) }]}>
             {journey.status === 'ON_TIME'
               ? 'On time'
               : journey.status === 'DELAYED'
@@ -122,82 +177,106 @@ export default function JourneyDetailScreen() {
             • Platform {journey.platform}
           </Text>
         </View>
-      </View>
 
-      {/* Live Progress Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Live Progress</Text>
-          <Text style={styles.liveBadge}>● LIVE</Text>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.stationList}>
-            {journey.stops?.map((stop, index) => {
-              const isCurrent = stop.status === 'BOARDING';
-              const isPassed = stop.status === 'DEPARTED' || stop.status === 'ARRIVED';
-
-              return (
-                <View
-                  key={stop.station.id}
-                  style={[styles.stationItem, isCurrent && styles.stationItemCurrent]}
-                >
-                  <Text style={styles.stationTime}>
-                    {format(new Date(stop.scheduledArrival), 'HH:mm')}
-                  </Text>
-
-                  <View style={styles.stationTrack}>
-                    <View
-                      style={[
-                        styles.trackDot,
-                        isCurrent && styles.trackDotCurrent,
-                        isPassed && styles.trackDotPassed,
-                      ]}
-                    />
-                    {index < (journey.stops?.length || 0) - 1 && (
-                      <View style={styles.trackLine} />
-                    )}
-                  </View>
-
-                  <Text style={styles.stationName}>{stop.station.name}</Text>
-
-                  <Text
-                    style={[
-                      styles.stationStatus,
-                      isCurrent && styles.stationStatusCurrent,
-                      isPassed && styles.stationStatusPassed,
-                    ]}
-                  >
-                    {stop.status === 'DEPARTED'
-                      ? 'Departed'
-                      : stop.status === 'BOARDING'
-                      ? 'Current'
-                      : stop.status === 'ARRIVED'
-                      ? 'Passed'
-                      : 'Scheduled'}
-                  </Text>
-                </View>
-              );
-            })}
+        {/* Progress Bar */}
+        <View style={styles.progressContainer}>
+          <ProgressBar
+            progress={journey.progress || 0}
+            status={journey.status}
+            height={8}
+            animated
+          />
+          <View style={styles.progressLabels}>
+            <Text style={styles.progressLabel}>Start</Text>
+            <Text style={[styles.progressLabel, styles.progressPercent]}>
+              {Math.round(journey.progress || 0)}%
+            </Text>
+            <Text style={styles.progressLabel}>Destination</Text>
           </View>
         </View>
-      </View>
+      </Animated.View>
+
+      {/* Journey Timeline */}
+      {journey.stops && journey.stops.length > 0 && (
+        <Animated.View entering={FadeInUp.delay(200)}>
+          <JourneyTimeline
+            stops={journey.stops}
+            currentStatus={journey.status}
+            progress={journey.progress || 0}
+          />
+        </Animated.View>
+      )}
 
       {/* Track Button */}
       {isSupported && (
-        <TouchableOpacity
-          style={styles.trackButton}
-          onPress={handleTrackJourney}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="lock-closed-outline" size={20} color={COLORS.text} />
-          <Text style={styles.trackButtonText}>
-            {activityId ? 'Tracking Active' : 'Track on Lock Screen'}
-          </Text>
-        </TouchableOpacity>
+        <Animated.View entering={FadeInUp.delay(300)}>
+          <TouchableOpacity
+            style={[
+              styles.trackButton,
+              activityId && styles.trackButtonActive,
+            ]}
+            onPress={handleTrackJourney}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={activityId ? 'lock-closed' : 'lock-closed-outline'}
+              size={20}
+              color={COLORS.text}
+            />
+            <Text style={styles.trackButtonText}>
+              {activityId ? 'Tracking Active' : 'Track on Lock Screen'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       )}
+
+      {/* Journey Info Card */}
+      <Animated.View entering={FadeInUp.delay(400)} style={styles.infoCard}>
+        <Text style={styles.infoTitle}>Journey Details</Text>
+        
+        <View style={styles.infoRow}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Train</Text>
+            <Text style={styles.infoValue}>{journey.trainNumber}</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Operator</Text>
+            <Text style={styles.infoValue}>{journey.operator || 'DB'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.infoRow}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Date</Text>
+            <Text style={styles.infoValue}>{format(departureTime, 'MMM d, yyyy')}</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Duration</Text>
+            <Text style={styles.infoValue}>{Math.floor(duration / 60)}h {duration % 60}m</Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      <View style={styles.bottomPadding} />
     </ScrollView>
   );
+}
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'ON_TIME':
+    case 'ARRIVED':
+      return COLORS.success;
+    case 'DELAYED':
+      return COLORS.warning;
+    case 'CANCELLED':
+      return COLORS.danger;
+    case 'BOARDING':
+    case 'DEPARTED':
+      return COLORS.primary;
+    default:
+      return COLORS.textSecondary;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -205,11 +284,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  loadingText: {
-    color: COLORS.text,
-    fontSize: 17,
-    textAlign: 'center',
-    marginTop: 100,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  errorHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hero: {
     paddingHorizontal: 20,
@@ -218,20 +320,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   trainBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     backgroundColor: 'rgba(0,122,255,0.15)',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 16,
   },
   trainNumber: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     color: COLORS.primary,
+  },
+  operator: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255,255,255,0.2)',
+    paddingLeft: 12,
   },
   routeLarge: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.text,
     letterSpacing: -0.5,
     marginBottom: 8,
@@ -248,7 +360,7 @@ const styles = StyleSheet.create({
   },
   timeBox: {
     alignItems: 'center',
-    minWidth: 70,
+    minWidth: 80,
   },
   timeValue: {
     fontSize: 32,
@@ -261,6 +373,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
     marginTop: 4,
+    textAlign: 'center',
   },
   timelineBar: {
     flex: 1,
@@ -301,10 +414,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   durationText: {
     fontSize: 12,
     color: COLORS.textSecondary,
+    fontWeight: '600',
   },
   statusPill: {
     flexDirection: 'row',
@@ -319,112 +435,29 @@ const styles = StyleSheet.create({
   statusDot: {
     width: 8,
     height: 8,
-    backgroundColor: COLORS.success,
     borderRadius: 4,
   },
   statusText: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.success,
   },
-  section: {
-    marginTop: 8,
+  progressContainer: {
+    width: '100%',
+    marginTop: 24,
+    paddingHorizontal: 20,
   },
-  sectionHeader: {
+  progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    marginTop: 10,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  liveBadge: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.danger,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    padding: 16,
-  },
-  stationList: {
-    flexDirection: 'column',
-  },
-  stationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2C2C2E',
-  },
-  stationItemCurrent: {
-    backgroundColor: 'rgba(0,122,255,0.1)',
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderBottomWidth: 0,
-  },
-  stationTime: {
-    width: 50,
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.text,
-    fontVariant: ['tabular-nums'],
-  },
-  stationTrack: {
-    width: 40,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  trackLine: {
-    position: 'absolute',
-    width: 2,
-    height: 40,
-    backgroundColor: '#3A3A3C',
-    top: 14,
-  },
-  trackDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#3A3A3C',
-    zIndex: 1,
-  },
-  trackDotCurrent: {
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-  },
-  trackDotPassed: {
-    backgroundColor: COLORS.success,
-  },
-  stationName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: COLORS.text,
-    paddingLeft: 12,
-  },
-  stationStatus: {
-    fontSize: 13,
+  progressLabel: {
+    fontSize: 12,
     color: COLORS.textSecondary,
   },
-  stationStatusCurrent: {
+  progressPercent: {
     color: COLORS.primary,
-    fontWeight: '600',
-  },
-  stationStatusPassed: {
-    color: COLORS.success,
+    fontWeight: '700',
   },
   trackButton: {
     flexDirection: 'row',
@@ -433,14 +466,54 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     marginHorizontal: 16,
     marginTop: 24,
-    marginBottom: 40,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 8,
+  },
+  trackButtonActive: {
+    backgroundColor: COLORS.success,
   },
   trackButtonText: {
     fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  infoCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 20,
+  },
+  infoItem: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 16,
     fontWeight: '600',
     color: COLORS.text,
+  },
+  bottomPadding: {
+    height: 40,
   },
 });

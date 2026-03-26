@@ -1,7 +1,7 @@
 /**
- * Stations Screen - Live departure board
+ * Stations Screen - Live departure board with airport FIDS style
  */
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,22 +9,33 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { useStationDepartures, useStationSearch } from '../../hooks/useJourneys';
+import { useStationDepartures, useStationSearch, usePullToRefresh } from '../../hooks/useJourneys';
 import { StationRow } from '../../components/StationRow';
+import { StationRowSkeleton } from '../../components/SkeletonLoader';
+import { NoResultsEmptyState, ErrorEmptyState } from '../../components/EmptyState';
 import { COLORS } from '../../lib/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 
 export default function StationsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStationId, setSelectedStationId] = useState<string>('1'); // Default to Berlin
-  const [selectedStationName, setSelectedStationName] = useState('Berlin Hbf');
+  const [selectedStationId, setSelectedStationId] = useState<string>('8000096'); // Berlin Hbf
+  const [selectedStationName, setSelectedStationName] = useState('Berlin Hauptbahnhof');
   const [activeTab, setActiveTab] = useState<'departures' | 'arrivals'>('departures');
 
   const { data: searchResults, isLoading: isSearching } = useStationSearch(searchQuery);
-  const { data: departures, isLoading: isLoadingDepartures } = useStationDepartures(selectedStationId);
+  const { 
+    data: departures, 
+    isLoading: isLoadingDepartures,
+    isError,
+    error,
+    refresh,
+    isRefreshing,
+  } = useStationDepartures(selectedStationId);
 
   const handleStationSelect = (stationId: string, stationName: string) => {
     setSelectedStationId(stationId);
@@ -32,10 +43,14 @@ export default function StationsScreen() {
     setSearchQuery('');
   };
 
+  const handleRetry = () => {
+    refresh();
+  };
+
   return (
     <View style={styles.container}>
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <Animated.View entering={FadeIn.duration(400)} style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Ionicons
             name="search"
@@ -56,7 +71,7 @@ export default function StationsScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </Animated.View>
 
       {/* Search Results */}
       {searchQuery.length >= 2 && (
@@ -70,7 +85,10 @@ export default function StationsScreen() {
                 style={styles.searchResultItem}
                 onPress={() => handleStationSelect(station.id, station.name)}
               >
-                <Text style={styles.searchResultText}>{station.name}</Text>
+                <View style={styles.searchResultContent}>
+                  <Ionicons name="location" size={18} color={COLORS.primary} />
+                  <Text style={styles.searchResultText}>{station.name}</Text>
+                </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />
               </TouchableOpacity>
             ))
@@ -81,13 +99,13 @@ export default function StationsScreen() {
       )}
 
       {/* Station Header */}
-      <View style={styles.stationHeader}>
+      <Animated.View entering={FadeInUp.delay(100)} style={styles.stationHeader}>
         <Text style={styles.stationName}>{selectedStationName}</Text>
-        <Text style={styles.stationSubtitle}>Central Station • Germany</Text>
-      </View>
+        <Text style={styles.stationSubtitle}>Live Departures • Germany</Text>
+      </Animated.View>
 
       {/* Tabs */}
-      <View style={styles.tabs}>
+      <Animated.View entering={FadeInUp.delay(150)} style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'departures' && styles.tabActive]}
           onPress={() => setActiveTab('departures')}
@@ -114,35 +132,73 @@ export default function StationsScreen() {
             Arrivals
           </Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Board Header */}
-      <View style={styles.boardHeader}>
+      <Animated.View entering={FadeInUp.delay(200)} style={styles.boardHeader}>
         <Text style={styles.boardHeaderText}>Time</Text>
         <Text style={styles.boardHeaderText}>Train</Text>
         <Text style={[styles.boardHeaderText, { flex: 1 }]}>Destination</Text>
         <Text style={[styles.boardHeaderText, { textAlign: 'right' }]}>Plat</Text>
-      </View>
+      </Animated.View>
 
       {/* Departure Board */}
       {isLoadingDepartures ? (
-        <ActivityIndicator color={COLORS.primary} style={styles.loader} />
-      ) : (
         <ScrollView style={styles.board} showsVerticalScrollIndicator={false}>
-          {departures?.map((departure) => (
-            <StationRow key={departure.id} departure={departure} />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <StationRowSkeleton key={i} />
           ))}
+        </ScrollView>
+      ) : isError ? (
+        <View style={styles.errorContainer}>
+          <ErrorEmptyState 
+            message={error?.message || "Couldn't load departures"}
+            onRetry={handleRetry}
+          />
+        </View>
+      ) : (
+        <ScrollView 
+          style={styles.board} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={refresh}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
+        >
+          {departures?.map((departure, index) => (
+            <StationRow 
+              key={departure.id} 
+              departure={departure}
+              index={index}
+            />
+          ))}
+          
+          {departures?.length === 0 && (
+            <NoResultsEmptyState />
+          )}
         </ScrollView>
       )}
 
       {/* Update Banner */}
-      <View style={styles.updateBanner}>
+      <Animated.View entering={FadeInUp.delay(300)} style={styles.updateBanner}>
         <View style={styles.updateDot} />
         <Text style={styles.updateText}>
           Last updated:{' '}
           <Text style={styles.updateTime}>{format(new Date(), 'HH:mm')}</Text>
         </Text>
-      </View>
+        <TouchableOpacity onPress={refresh} style={styles.refreshButton}>
+          <Ionicons 
+            name="refresh" 
+            size={16} 
+            color={COLORS.primary}
+            style={isRefreshing && styles.refreshingIcon}
+          />
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -163,7 +219,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderRadius: 12,
     paddingHorizontal: 12,
-    height: 44,
+    height: 48,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   searchIcon: {
     marginRight: 8,
@@ -175,14 +233,21 @@ const styles = StyleSheet.create({
   },
   searchResults: {
     position: 'absolute',
-    top: 60,
+    top: 70,
     left: 16,
     right: 16,
     backgroundColor: COLORS.card,
     borderRadius: 12,
     padding: 8,
     zIndex: 100,
-    maxHeight: 200,
+    maxHeight: 250,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   searchResultItem: {
     flexDirection: 'row',
@@ -193,9 +258,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#2C2C2E',
   },
+  searchResultContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   searchResultText: {
     color: COLORS.text,
     fontSize: 16,
+    fontWeight: '500',
   },
   noResults: {
     color: COLORS.textSecondary,
@@ -208,7 +279,7 @@ const styles = StyleSheet.create({
   },
   stationName: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.text,
     letterSpacing: -0.5,
   },
@@ -225,7 +296,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: COLORS.card,
     borderRadius: 10,
     alignItems: 'center',
@@ -235,7 +306,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
     color: COLORS.textSecondary,
   },
   tabTextActive: {
@@ -251,10 +322,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
   },
   boardHeaderText: {
-    width: 60,
+    width: 55,
     fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
+    fontWeight: '800',
+    color: COLORS.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -268,9 +339,10 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
   },
-  loader: {
+  errorContainer: {
     flex: 1,
     justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   updateBanner: {
     flexDirection: 'row',
@@ -278,8 +350,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     margin: 16,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   updateDot: {
     width: 8,
@@ -290,9 +364,16 @@ const styles = StyleSheet.create({
   updateText: {
     fontSize: 13,
     color: COLORS.textSecondary,
+    flex: 1,
   },
   updateTime: {
     color: COLORS.text,
     fontWeight: '600',
+  },
+  refreshButton: {
+    padding: 4,
+  },
+  refreshingIcon: {
+    transform: [{ rotate: '45deg' }],
   },
 });
