@@ -18,6 +18,9 @@
       "bundleIdentifier": "com.railmate.app",
       "buildNumber": "1.0.0",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "infoPlist": {
         "NSSupportsLiveActivities": true,
         "NSSupportsLiveActivitiesFrequentUpdates": true,
         "NSLocationWhenInUseUsageDescription": "Railmate uses your location to show nearby stations and track your journey progress.",
