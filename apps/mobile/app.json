@@ -33,7 +33,7 @@
     "android": {
       "package": "com.railmate.app",
       "versionCode": 2,
-      "jsEngine": "jsc",
+      "jsEngine": "hermes",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
