@@ -34,6 +34,11 @@
       "package": "com.railmate.app",
       "versionCode": 2,
       "jsEngine": "hermes",
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -57,6 +62,12 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Railmate to use your location to show nearby stations and track your journey."
+        }
+      ],
+      [
+        "react-native-maps",
+        {
+          "androidApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
         }
       ]
     ],
