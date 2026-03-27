@@ -2,6 +2,7 @@
   "expo": {
     "name": "Railmate",
     "slug": "railmate",
+    "owner": "cody152",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,7 +21,10 @@
         "NSSupportsLiveActivities": true,
         "NSSupportsLiveActivitiesFrequentUpdates": true,
         "NSLocationWhenInUseUsageDescription": "Railmate uses your location to show nearby stations and track your journey progress.",
-        "UIBackgroundModes": ["fetch", "remote-notification"]
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ]
       },
       "entitlements": {
         "com.apple.developer.live-activities": true
@@ -29,6 +33,7 @@
     "android": {
       "package": "com.railmate.app",
       "versionCode": 1,
+      "jsEngine": "jsc",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -37,11 +42,14 @@
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
@@ -52,6 +60,12 @@
         }
       ]
     ],
-    "scheme": "railmate"
+    "scheme": "railmate",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "78244ca5-7fdb-4900-9362-c858721f82e5"
+      }
+    }
   }
 }

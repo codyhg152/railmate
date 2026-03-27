@@ -280,7 +280,7 @@ export default function JourneyDetailScreen() {
         {/* Status Pill */}
         <View style={styles.statusPill}>
           <View style={[styles.statusDot, { backgroundColor: getStatusColor(journey.status) }]} />
-          <Text style={[styles.statusText, { color: getStatusColor(journey.status) }]}
+          <Text style={[styles.statusText, { color: getStatusColor(journey.status) }]}>
             {journey.status === 'ON_TIME'
               ? 'On time'
               : journey.status === 'DELAYED'

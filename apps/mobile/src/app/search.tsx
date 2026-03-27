@@ -21,7 +21,7 @@ import { Station, TrainJourney } from '../lib/types';
 import { COLORS } from '../lib/constants';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { StatusBadge } from '../components/StatusBadge';
+import { StatusText } from '../components/StatusText';
 import { NoResultsEmptyState, ErrorEmptyState } from '../components/EmptyState';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 
@@ -266,7 +266,7 @@ export default function SearchScreen() {
                           {journey.trainNumber}
                         </Text>
                       </View>
-                      <StatusBadge status={journey.status} delayMinutes={journey.delayMinutes} size="small" />
+                      <StatusText status={journey.status} delayMinutes={journey.delayMinutes} />
                     </View>
 
                     <View style={styles.journeyTimes}>
