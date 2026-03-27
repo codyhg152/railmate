@@ -1,6 +1,20 @@
 /**
  * Root layout with Expo Router
  */
+
+// Polyfill for WeakRef if not available
+if (typeof WeakRef === 'undefined') {
+  (global as any).WeakRef = class WeakRef<T> {
+    private target: T | undefined;
+    constructor(target: T) {
+      this.target = target;
+    }
+    deref(): T | undefined {
+      return this.target;
+    }
+  };
+}
+
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
