@@ -34,6 +34,9 @@ A premium train tracking app built with React Native and Expo, inspired by Fligh
 
 ## Screenshots 📸
 
+### My Trains (Home Screen)
+![My Trains](screenshots/my-trains.png)
+
 | Home | Map | Station Board |
 |------|-----|---------------|
 | My Trains list | Live route map | Departure board |
